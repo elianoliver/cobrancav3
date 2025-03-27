@@ -1,0 +1,7 @@
+**/pycache
+*.pyc
+.venv
+*.xlsx
+*.json
+teste2.py
+*.xlsx#
