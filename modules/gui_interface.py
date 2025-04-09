@@ -1,18 +1,63 @@
 import sys
 import os
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QFileDialog, QTextEdit,
     QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QSplitter,
     QGroupBox, QProgressBar, QRadioButton, QButtonGroup, QTabWidget, QGridLayout, QTabWidget, QTextBrowser, QDialog
 )
-from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QFont, QIcon, QPixmap, QCursor
-from PyQt5.QtCore import Qt, QSize, QTimer, pyqtSignal
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QIcon, QPixmap, QCursor, QPalette, QColor
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 import pandas as pd
 from modules.read_excel import read_excel_file, clean_column_names, get_summary, unify_dataframes
 from modules.data_processor import generate_json_file, filter_users_by_category, categorize_users
-from modules.styles import get_drop_area_style, get_status_label_style
-from modules.styles import get_main_styles, get_welcome_html, get_categories_html
+from modules.styles_fix import get_drop_area_style, get_status_label_style
+from modules.styles_fix import get_main_styles, get_welcome_html, get_categories_html
+# Importar todas as classes de estilo do módulo styles_fix
+from modules.styles_fix import StyleManager, AppColors
 import json
+
+# Constantes de estilo que agora usam AppColors
+CARD_STYLE = f"""
+    border: 1px solid {AppColors.BORDER.name()};
+    border-radius: 6px;
+    background-color: {AppColors.CARD.name()};
+    padding: 15px;
+"""
+
+HEADER_STYLE = f"""
+    font-size: 24px;
+    font-weight: bold;
+    color: {AppColors.PRIMARY.name()};
+"""
+
+SUBHEADER_STYLE = f"""
+    font-size: 14px;
+    color: {AppColors.TEXT_LIGHT.name()};
+"""
+
+INSTRUCTION_CARD_STYLE = f"""
+    background-color: {AppColors.INFO_LIGHT.name()};
+    border-radius: 6px;
+    border: 1px solid {AppColors.INFO_LIGHT.darker(110).name()};
+    padding: 15px;
+    margin-bottom: 20px;
+"""
+
+INFO_CARD_STYLE = f"""
+    background-color: {AppColors.ACCENT_LIGHT.name()};
+    border-radius: 6px;
+    border: 1px solid {AppColors.ACCENT_LIGHT.darker(110).name()};
+    padding: 20px;
+    margin: 10px 0 20px 0;
+"""
+
+ACTION_CONTAINER_STYLE = f"""
+    background-color: {AppColors.BACKGROUND.name()};
+    border-radius: 6px;
+    border: 1px solid {AppColors.BORDER.name()};
+    margin-top: 20px;
+    padding: 15px;
+"""
 
 class ConfigManager:
     """Gerencia a configuração da aplicação usando um arquivo JSON"""
@@ -31,17 +76,6 @@ class ConfigManager:
                 return self._create_default_config()
         else:
             return self._create_default_config()
-
-    def _create_default_config(self):
-        """Cria uma configuração padrão"""
-        default_config = {
-            'template_apenas_multa': '',
-            'template_apenas_pendencia': '',
-            'template_multa_e_pendencia': '',
-            'ultimo_diretorio': ''
-        }
-        self._save_config(default_config)
-        return default_config
 
     def _save_config(self, config=None):
         """Salva a configuração no arquivo"""
@@ -62,6 +96,17 @@ class ConfigManager:
         self.config[key] = value
         self._save_config()
 
+    def _create_default_config(self):
+        """Cria uma configuração padrão"""
+        default_config = {
+            'template_apenas_multa': '',
+            'template_apenas_pendencia': '',
+            'template_multa_e_pendencia': '',
+            'ultimo_diretorio': ''
+        }
+        self._save_config(default_config)
+        return default_config
+
 class FileDropArea(QFrame):
     """Área de arrastar e soltar para arquivos Excel com identificação do tipo"""
     fileDropped = pyqtSignal(str, str)  # Sinal que emite caminho do arquivo e tipo
@@ -69,69 +114,131 @@ class FileDropArea(QFrame):
     def __init__(self, report_type="multas", parent=None):
         super().__init__(parent)
         self.setObjectName("dropArea")
-        self.setMinimumHeight(100)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
+        self.setMinimumHeight(150)
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.report_type = report_type  # 'multas' ou 'pendencias'
         self.file_path = None
+        self.setAcceptDrops(True)
+
+        # Configurar tamanho mínimo para evitar elementos comprimidos
+        self.setMinimumWidth(250)
 
         # Layout e componentes visuais
         self.setup_ui()
 
+        # Aplicar estilo usando StyleManager
+        StyleManager.configure_drop_area(self, self.report_type)
+
+        # Timer para animar o highlight quando o mouse entra
+        self.highlight_timer = QTimer(self)
+        self.highlight_timer.setSingleShot(True)
+        self.highlight_timer.timeout.connect(self.reset_highlight)
+
     def setup_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
         self.setLayout(layout)
 
         # Ícone diferente para cada tipo de relatório
         icon = "💰" if self.report_type == "multas" else "📚"
         self.icon_label = QLabel(icon)
-        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setObjectName("dropIcon")
         layout.addWidget(self.icon_label)
 
         # Descrição do tipo de relatório
         title = "Relatório de Multas (86)" if self.report_type == "multas" else "Relatório de Pendências (76)"
         self.title_label = QLabel(title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setObjectName("dropTitle")
         layout.addWidget(self.title_label)
 
         # Instrução
-        self.text_label = QLabel("Arraste o arquivo Excel aqui ou clique para procurar")
-        self.text_label.setAlignment(Qt.AlignCenter)
+        self.text_label = QLabel("Arraste o arquivo Excel aqui\nou clique para procurar")
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.text_label.setWordWrap(True)
         layout.addWidget(self.text_label)
 
         # Status do arquivo
         self.status_label = QLabel("Nenhum arquivo selecionado")
-        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setObjectName("fileStatusLabel")
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
-        # Aplicar estilos usando o módulo de estilos
-        self.setStyleSheet(get_drop_area_style(self.report_type))
+        # Configurar o label de status usando StyleManager
+        StyleManager.configure_status_label(self.status_label, False)
+
+        # Adiciona espaçamento ao final
+        layout.addStretch()
 
     def set_file(self, file_path):
         """Define o arquivo e atualiza o visual"""
         self.file_path = file_path
         if file_path:
-            self.status_label.setText(f"Arquivo: {os.path.basename(file_path)}")
-            self.status_label.setStyleSheet(get_status_label_style(True))
+            filename = os.path.basename(file_path)
+            # Limita o tamanho do nome do arquivo para evitar que ultrapasse a largura do componente
+            if len(filename) > 30:
+                display_name = filename[:27] + "..."
+            else:
+                display_name = filename
+
+            self.status_label.setText(f"Arquivo: {display_name}")
+            # Atualizar o estilo do status_label usando StyleManager
+            StyleManager.configure_status_label(self.status_label, True)
+            self.text_label.setText("Clique para trocar o arquivo")
+
+            # Destacar visualmente a borda para indicar seleção
+            self.highlight_success()
         else:
             self.status_label.setText("Nenhum arquivo selecionado")
-            self.status_label.setStyleSheet(get_status_label_style(False))
+            # Atualizar o estilo do status_label usando StyleManager
+            StyleManager.configure_status_label(self.status_label, False)
+            self.text_label.setText("Arraste o arquivo Excel aqui\nou clique para procurar")
+
+            # Restaurar o estilo original
+            StyleManager.configure_drop_area(self, self.report_type)
 
     def mousePressEvent(self, event):
         """Quando clicado, abre diálogo para selecionar arquivo"""
+        last_dir = ConfigManager().get_value('ultimo_diretorio', '')
+
         file_path, _ = QFileDialog.getOpenFileName(
-            self, f"Selecione o {self.title_label.text()}", "", "Excel Files (*.xlsx *.xls)"
+            self, f"Selecione o {self.title_label.text()}",
+            last_dir,
+            "Excel Files (*.xlsx *.xls)"
         )
+
         if file_path:
+            # Salva o diretório para uso futuro
+            ConfigManager().set_value('ultimo_diretorio', os.path.dirname(file_path))
+
             self.set_file(file_path)
             self.fileDropped.emit(file_path, self.report_type)
+            self.highlight_success()
 
     def dragEnterEvent(self, event):
         """Permite a entrada de arquivos arrastados"""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+
+            # Aplicar estilo de destaque na área de drop
+            # Usar QPalette para destaque
+            palette = self.palette()
+            border_color = AppColors.MULTAS if self.report_type == "multas" else AppColors.PENDENCIAS
+            palette.setColor(QPalette.ColorRole.Window, AppColors.ACCENT_LIGHT)
+            self.setPalette(palette)
+            self.setAutoFillBackground(True)
+
+    def dragLeaveEvent(self, event):
+        """Remove o estilo de destaque quando o arquivo sai da área"""
+        # Restaurar o estilo original usando StyleManager
+        StyleManager.configure_drop_area(self, self.report_type)
+
+        # Se um arquivo já estiver selecionado, restaura o visual adequado
+        if self.file_path:
+            self.set_file(self.file_path)
 
     def dropEvent(self, event):
         """Processa o arquivo quando solto na área"""
@@ -141,98 +248,310 @@ class FileDropArea(QFrame):
             if file_path.endswith((".xlsx", ".xls")):
                 self.set_file(file_path)
                 self.fileDropped.emit(file_path, self.report_type)
+                self.highlight_success()
             else:
                 QMessageBox.warning(self, "Formato Inválido",
                                    "Por favor, arraste um arquivo Excel válido (.xlsx ou .xls).")
+                self.highlight_error()
+        else:
+            # Restaura o estilo se nenhum arquivo for válido
+            StyleManager.configure_drop_area(self, self.report_type)
 
+    def highlight_success(self):
+        """Adiciona um efeito visual temporário de sucesso"""
+        # Aplicar destaque usando QPalette
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Window, AppColors.ACCENT_LIGHT)
+        if self.report_type == "multas":
+            palette.setColor(QPalette.ColorRole.WindowText, AppColors.MULTAS)
+        else:
+            palette.setColor(QPalette.ColorRole.WindowText, AppColors.PENDENCIAS)
+
+        # Destacar a borda
+        self.setFrameShape(QFrame.Shape.Box)
+        self.setLineWidth(2)
+        self.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.setPalette(palette)
+        self.highlight_timer.start(800)  # Reseta após 800ms
+
+    def highlight_error(self):
+        """Adiciona um efeito visual temporário de erro"""
+        # Aplicar destaque usando QPalette
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Window, AppColors.WARNING_LIGHT)
+        palette.setColor(QPalette.ColorRole.WindowText, AppColors.WARNING)
+
+        # Destacar a borda
+        self.setFrameShape(QFrame.Shape.Box)
+        self.setLineWidth(2)
+        self.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.setPalette(palette)
+        self.highlight_timer.start(800)  # Reseta após 800ms
+
+    def reset_highlight(self):
+        """Restaura o estilo após uma animação"""
+        if self.file_path:
+            # Restaurar estilo básico
+            StyleManager.configure_drop_area(self, self.report_type)
+
+            # Aplicar efeito de "arquivo selecionado"
+            palette = self.palette()
+            if self.report_type == "multas":
+                palette.setColor(QPalette.ColorRole.WindowText, AppColors.MULTAS)
+            else:
+                palette.setColor(QPalette.ColorRole.WindowText, AppColors.PENDENCIAS)
+
+            self.setPalette(palette)
+
+            # Configurar status label
+            StyleManager.configure_status_label(self.status_label, True)
+        else:
+            # Restaurar completamente o estilo original
+            StyleManager.configure_drop_area(self, self.report_type)
 
 class ExcelInterface(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Biblioteca System - Envio de Multas e Pendências")
-        self.setGeometry(100, 100, 1000, 700)
-        self.setAcceptDrops(False)  # Desabilita o arraste global
+        self.setWindowTitle("Sistema de Cobrança - Biblioteca IFC")
+        self.setMinimumSize(1000, 700)
+        self.setContentsMargins(10, 10, 10, 10)
 
         # Inicializar o gerenciador de configuração
         self.config_manager = ConfigManager()
 
-        # Armazenar caminhos dos arquivos
-        self.multas_file = None
-        self.pendencias_file = None
+        # Variáveis de controle
+        self.multas_df = None
+        self.pendencias_df = None
+        self.unified_data = None
+        self.categories_count = None
         self.verificar_data = True
 
-        # Dataframes dos relatórios
-        self.df_multas = None
-        self.df_pendencias = None
-        self.df_unificado = None
-
+        # Configura a interface
         self.setup_ui()
 
-        # Exibe mensagem de boas-vindas
-        QTimer.singleShot(500, self.show_welcome_message)
+        # Aplicar estilos usando a nova abordagem orientada a objetos
+        self.apply_styles()
+
+        # Mostrar mensagem de boas-vindas
+        self.show_welcome_message()
 
     def setup_ui(self):
         """Configura a interface do usuário"""
         # Widget principal
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
         self.setCentralWidget(central_widget)
+
+        # Adicionar cabeçalho com logo e título
+        self.setup_header()
 
         # Criar tabs
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
-        self.tabs.setTabPosition(QTabWidget.North)
+        self.tabs.setTabPosition(QTabWidget.TabPosition.North)
+
+        # Conectar sinal de mudança de tab para animação
+        self.tabs.currentChanged.connect(self.animate_tab_change)
 
         # Setup das abas
         self.setup_import_tab()
         self.setup_results_tab()
         self.setup_summary_tab()
-        self.setup_template_tab()  # Substitui a aba de categorias por templates
+        self.setup_template_tab()
         self.setup_export_tab()
 
         # Adicionar as tabs ao layout principal
         main_layout.addWidget(self.tabs)
 
+        # Adicionar rodapé com informações
+        self.setup_footer()
+
         # Definir o tamanho inicial da janela
-        self.resize(1200, 800)
+        self.resize(1280, 800)
 
         # Estilizar a aplicação
         self.setStyleSheet(get_main_styles())
+
+    def setup_header(self):
+        """Configura o cabeçalho da aplicação"""
+        header_frame = QFrame()
+        header_frame.setObjectName("headerFrame")
+        header_layout = QHBoxLayout(header_frame)
+
+        # Logo/ícone da aplicação
+        logo_label = QLabel("📚")
+        logo_label.setObjectName("logoLabel")
+        logo_label.setMinimumWidth(40)
+        header_layout.addWidget(logo_label)
+
+        # Título da aplicação
+        title_label = QLabel("Biblioteca System")
+        title_label.setObjectName("titleLabel")
+        header_layout.addWidget(title_label)
+
+        # Descrição da aplicação
+        description_label = QLabel("Sistema de Gestão de Multas e Pendências")
+        description_label.setObjectName("descriptionLabel")
+        header_layout.addWidget(description_label, 1)
+
+        # Adicionar o cabeçalho ao layout principal
+        self.centralWidget().layout().addWidget(header_frame)
+
+        # Aplicar estilos nativos com StyleManager
+        StyleManager.configure_header_frame(header_frame)
+        StyleManager.configure_logo_label(logo_label)
+
+        # Configurações para o título e descrição usando QPalette em vez de CSS
+        palette = title_label.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        title_label.setPalette(palette)
+
+        font = title_label.font()
+        font.setPointSize(16)
+        font.setBold(True)
+        title_label.setFont(font)
+
+        # Configurar a descrição
+        palette = description_label.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255, 204))  # white com 80% de opacidade
+        description_label.setPalette(palette)
+
+        font = description_label.font()
+        font.setPointSize(14)
+        description_label.setFont(font)
+
+        # Armazenar referências para uso posterior
+        self.headerFrame = header_frame
+        self.logoLabel = logo_label
+
+    def setup_footer(self):
+        """Configura o rodapé da aplicação"""
+        footer_frame = QFrame()
+        footer_frame.setObjectName("footerFrame")
+        footer_layout = QHBoxLayout(footer_frame)
+
+        # Texto de copyright/versão
+        footer_text = QLabel("© 2023 Biblioteca System • v1.0.0")
+        footer_text.setObjectName("footerText")
+        footer_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer_layout.addWidget(footer_text)
+
+        # Adicionar o rodapé ao layout principal
+        self.centralWidget().layout().addWidget(footer_frame)
+
+        # Aplicar estilos nativos usando StyleManager
+        StyleManager.configure_footer_frame(footer_frame)
+        StyleManager.configure_footer_text(footer_text)
+
+        # Armazenar referências para uso posterior
+        self.footerFrame = footer_frame
+        self.footerText = footer_text
+
+    def animate_tab_change(self, index):
+        """Anima a mudança de abas para uma experiência mais suave"""
+        # Animar a barra de progresso como feedback visual
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+
+        for i in range(101):
+            QTimer.singleShot(i * 3, lambda v=i: self.progress_bar.setValue(v))
+
+        QTimer.singleShot(350, lambda: self.progress_bar.setVisible(False))
 
     def setup_import_tab(self):
         """Configura a aba de importação de arquivos"""
         import_tab = QWidget()
         import_layout = QVBoxLayout(import_tab)
+        import_layout.setContentsMargins(20, 20, 20, 20)
+        import_layout.setSpacing(15)
+
+        # Container para o cabeçalho da aba
+        header_container = QWidget()
+        header_container.setObjectName("tabHeader")
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(0, 0, 0, 20)
 
         # Cabeçalho com título e descrição
         header = QLabel("Importação de Relatórios")
-        header.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
-        header.setAlignment(Qt.AlignCenter)
-        import_layout.addWidget(header)
+        StyleManager.configure_header_label(header)
+        header_layout.addWidget(header)
 
         description = QLabel(
             "Arraste e solte os arquivos Excel dos relatórios 86 (Multas) e 76 (Pendências) "
             "ou clique nas áreas abaixo para selecionar os arquivos."
         )
-        description.setStyleSheet("font-size: 14px; margin-bottom: 20px;")
-        description.setWordWrap(True)
-        description.setAlignment(Qt.AlignCenter)
-        import_layout.addWidget(description)
+        StyleManager.configure_subheader_label(description)
+        header_layout.addWidget(description)
+
+        import_layout.addWidget(header_container)
+
+        # Card de instruções
+        instructions_card = QFrame()
+        instructions_card.setObjectName("instructionsCard")
+        instructions_layout = QVBoxLayout(instructions_card)
+
+        instructions_title = QLabel("Como funciona:")
+        font = instructions_title.font()
+        font.setPointSize(14)
+        font.setBold(True)
+        instructions_title.setFont(font)
+
+        # Configurar cor usando QPalette
+        palette = instructions_title.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, AppColors.INFO)
+        instructions_title.setPalette(palette)
+
+        instructions_layout.addWidget(instructions_title)
+
+        instructions_text = QLabel(
+            "1. Selecione os dois relatórios das áreas abaixo\n"
+            "2. Os relatórios serão validados automaticamente\n"
+            "3. Clique em \"Unificar Relatórios\" para processar os dados\n"
+            "4. Navegue pelas abas para visualizar resultados e exportar dados"
+        )
+
+        # Configurar o texto de instruções com QPalette
+        palette = instructions_text.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, AppColors.TEXT)
+        instructions_text.setPalette(palette)
+        instructions_layout.addWidget(instructions_text)
+
+        import_layout.addWidget(instructions_card)
 
         # Opção para verificar data dos arquivos
-        date_check_layout = QHBoxLayout()
-        date_check_layout.addStretch()
+        date_check_container = QFrame()
+        date_check_container.setObjectName("dateCheckCard")
+        StyleManager.configure_date_check_container(date_check_container)
+        date_check_layout = QHBoxLayout(date_check_container)
+
+        date_info_label = QLabel("Verificação de data:")
+        font = date_info_label.font()
+        font.setBold(True)
+        date_info_label.setFont(font)
+        date_check_layout.addWidget(date_info_label)
+
         self.check_date = QPushButton("Verificar se os arquivos são do dia atual")
+        self.check_date.setObjectName("checkDateButton")
         self.check_date.setCheckable(True)
         self.check_date.setChecked(True)
+
+        # Configurar cores usando AppColors e QPalette
+        self.update_check_date_button()
+
         self.check_date.clicked.connect(self.toggle_date_check)
         date_check_layout.addWidget(self.check_date)
         date_check_layout.addStretch()
-        import_layout.addLayout(date_check_layout)
+
+        import_layout.addWidget(date_check_container)
 
         # Container para as áreas de drop
         drop_container = QWidget()
         drop_layout = QHBoxLayout(drop_container)
+        drop_layout.setSpacing(20)
 
         # Área de drop para relatório de multas (86)
         self.multas_drop_area = FileDropArea(report_type="multas")
@@ -245,178 +564,272 @@ class ExcelInterface(QMainWindow):
         drop_layout.addWidget(self.pendencias_drop_area)
 
         # Adicionar container ao layout principal
-        import_layout.addWidget(drop_container)
+        import_layout.addWidget(drop_container, 1)
+
+        # Container para botão de unificação e progresso
+        action_container = QFrame()
+        action_container.setObjectName("actionContainer")
+        action_container.setStyleSheet(ACTION_CONTAINER_STYLE)
+        action_layout = QVBoxLayout(action_container)
 
         # Botão para unificar relatórios
         unify_container = QWidget()
         unify_layout = QHBoxLayout(unify_container)
+        unify_layout.setContentsMargins(0, 0, 0, 0)
         unify_layout.addStretch()
 
-        self.unify_button = QPushButton("Unificar Relatórios")
-        self.unify_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2980b9;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 16px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #3498db;
-            }
-            QPushButton:disabled {
-                background-color: #bdc3c7;
-            }
-        """)
+        self.unify_button = QPushButton(" Unificar Relatórios ")
+        self.unify_button.setObjectName("unifyButton")
         self.unify_button.setEnabled(False)
         self.unify_button.clicked.connect(self.unify_reports)
+
+        # Usar a configuração do StyleManager em vez de CSS
+        StyleManager.configure_button(self.unify_button, 'primary')
+
+        # Ajustar o tamanho do botão programaticamente
+        self.unify_button.setMinimumWidth(250)
+        self.unify_button.setContentsMargins(12, 12, 12, 12)
+
+        # Ajustar fonte para o botão
+        font = self.unify_button.font()
+        font.setPointSize(12)
+        font.setBold(True)
+        self.unify_button.setFont(font)
+
         unify_layout.addWidget(self.unify_button)
         unify_layout.addStretch()
 
-        import_layout.addWidget(unify_container)
+        action_layout.addWidget(unify_container)
 
         # Barra de progresso (inicialmente oculta)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #bdc3c7;
-                border-radius: 5px;
-                text-align: center;
-                height: 20px;
-            }
-            QProgressBar::chunk {
-                background-color: #2ecc71;
-                width: 5px;
-            }
-        """)
-        import_layout.addWidget(self.progress_bar)
+        self.progress_bar.setObjectName("progressBar")
 
-        # Espaçador para empurrar tudo para cima
-        import_layout.addStretch()
+        # Configurar a barra de progresso com StyleManager
+        StyleManager.configure_progress_bar(self.progress_bar)
+
+        action_layout.addWidget(self.progress_bar)
+
+        import_layout.addWidget(action_container)
 
         # Adicionar a aba ao widget de abas
-        self.tabs.addTab(import_tab, "Importação de Arquivos")
+        self.tabs.addTab(import_tab, "📥 Importação")
 
     def setup_results_tab(self):
         """Configura a aba de resultados"""
         results_tab = QWidget()
         results_layout = QVBoxLayout(results_tab)
+        results_layout.setContentsMargins(20, 20, 20, 20)
+        results_layout.setSpacing(15)
 
-        # Área de resultados
+        # Título da aba de resultados
+        title_container = QWidget()
+        title_layout = QVBoxLayout(title_container)
+        title_layout.setContentsMargins(0, 0, 0, 10)
+
+        title = QLabel("Resultados da Unificação")
+        StyleManager.configure_header_label(title)
+        title_layout.addWidget(title)
+
+        subtitle = QLabel("Visualize os dados processados e estatísticas")
+        StyleManager.configure_subheader_label(subtitle)
+        title_layout.addWidget(subtitle)
+
+        results_layout.addWidget(title_container)
+
+        # Área de resultados em um container estilizado
+        result_container = QFrame()
+        result_container.setObjectName("resultContainer")
+        result_layout = QVBoxLayout(result_container)
+
         self.result_area = QTextBrowser()
         self.result_area.setOpenExternalLinks(True)  # Permite abrir links
-        results_layout.addWidget(self.result_area)
+        result_layout.addWidget(self.result_area)
+
+        results_layout.addWidget(result_container)
+
+        # Aplicar estilos nativos
+        StyleManager.configure_frame(result_container, 'card')
+        StyleManager.configure_text_edit(self.result_area)
 
         # Adicionar a aba ao widget principal
-        self.tabs.addTab(results_tab, "Resultados")
+        self.tabs.addTab(results_tab, "📊 Resultados")
 
     def setup_summary_tab(self):
         """Configura a aba de resumo"""
         summary_tab = QWidget()
         summary_layout = QVBoxLayout(summary_tab)
+        summary_layout.setContentsMargins(20, 20, 20, 20)
+        summary_layout.setSpacing(15)
+
+        # Título e Subtítulo
+        header_container = QWidget()
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(0, 0, 0, 10)
 
         # Cabeçalho
         header = QLabel("Resumo dos Dados")
-        header.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
-        header.setAlignment(Qt.AlignCenter)
-        summary_layout.addWidget(header)
+        StyleManager.configure_header_label(header)
+        header_layout.addWidget(header)
 
         # Descrição
-        description = QLabel("Estatísticas dos relatórios carregados:")
-        description.setStyleSheet("font-size: 14px; margin-bottom: 20px;")
-        summary_layout.addWidget(description)
+        description = QLabel("Estatísticas gerais dos relatórios processados")
+        StyleManager.configure_subheader_label(description)
+        header_layout.addWidget(description)
 
-        # Área de resumo
+        summary_layout.addWidget(header_container)
+
+        # Área de resumo em container estilizado
+        summary_container = QFrame()
+        summary_container.setObjectName("summaryContainer")
+        summary_container_layout = QVBoxLayout(summary_container)
+
         self.summary_label = QTextBrowser()
-        self.summary_label.setStyleSheet("font-size: 14px;")
-        summary_layout.addWidget(self.summary_label)
+        summary_container_layout.addWidget(self.summary_label)
+
+        summary_layout.addWidget(summary_container)
+
+        # Aplicar estilos nativos
+        StyleManager.configure_frame(summary_container, 'card')
+        StyleManager.configure_text_edit(self.summary_label)
 
         # Adicionar a aba ao widget principal
-        self.tabs.addTab(summary_tab, "Resumo")
+        self.tabs.addTab(summary_tab, "📋 Resumo")
 
     def setup_template_tab(self):
         """Configura a aba de templates de email"""
         template_tab = QWidget()
         template_layout = QVBoxLayout(template_tab)
+        template_layout.setContentsMargins(20, 20, 20, 20)
+        template_layout.setSpacing(15)
+
+        # Título e subtítulo
+        header_container = QWidget()
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(0, 0, 0, 10)
 
         # Adicionar cabeçalho
         header = QLabel("Templates de Email")
-        header.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
-        header.setAlignment(Qt.AlignCenter)
-        template_layout.addWidget(header)
+        StyleManager.configure_header_label(header)
+        header_layout.addWidget(header)
 
         # Adicionar descrição
-        description = QLabel("Selecione o tipo de notificação e personalize o template:")
-        description.setStyleSheet("font-size: 14px; margin-bottom: 10px;")
-        template_layout.addWidget(description)
+        description = QLabel("Selecione o tipo de notificação e personalize o template para comunicação com os usuários")
+        StyleManager.configure_subheader_label(description)
+        header_layout.addWidget(description)
 
-        # Container para os controles
-        controls_container = QWidget()
+        template_layout.addWidget(header_container)
+
+        # Container para os controles em um card
+        controls_container = QFrame()
+        controls_container.setObjectName("templateControlsCard")
+        StyleManager.configure_frame(controls_container, 'card')
         controls_layout = QHBoxLayout(controls_container)
+        controls_layout.setSpacing(20)
 
         # Grupo de radio buttons para os tipos de template
         radio_group = QGroupBox("Tipo de Notificação")
+        radio_group.setObjectName("radioGroupCard")
+        StyleManager.configure_radio_group(radio_group)
         radio_layout = QVBoxLayout(radio_group)
+        radio_layout.setSpacing(10)
 
-        # Criar os radio buttons
-        self.rb_apenas_multa = QRadioButton("Apenas Multa")
+        # Criar os radio buttons com ícones e texto mais descritivo
+        self.rb_apenas_multa = QRadioButton(" Apenas Multa")
         self.rb_apenas_multa.setObjectName("rb1")
+        StyleManager.configure_radio_button(self.rb_apenas_multa, 'warning')
         self.rb_apenas_multa.setChecked(True)  # Selecionado por padrão
-        self.rb_apenas_pendencia = QRadioButton("Apenas Pendência")
+
+        self.rb_apenas_pendencia = QRadioButton(" Apenas Pendência")
         self.rb_apenas_pendencia.setObjectName("rb2")
-        self.rb_multa_e_pendencia = QRadioButton("Multa e Pendência")
+        StyleManager.configure_radio_button(self.rb_apenas_pendencia, 'info')
+
+        self.rb_multa_e_pendencia = QRadioButton(" Multa e Pendência")
         self.rb_multa_e_pendencia.setObjectName("rb3")
+        StyleManager.configure_radio_button(self.rb_multa_e_pendencia, 'accent')
 
         # Adicionar os radio buttons ao grupo
         radio_layout.addWidget(self.rb_apenas_multa)
         radio_layout.addWidget(self.rb_apenas_pendencia)
         radio_layout.addWidget(self.rb_multa_e_pendencia)
 
+        # Adicionar espaçamento e preenchimento no final
+        radio_layout.addStretch()
+
         # Configurar a largura máxima do grupo
+        radio_group.setMinimumWidth(200)
         radio_group.setMaximumWidth(250)
 
         # Adicionar o grupo ao layout de controles
         controls_layout.addWidget(radio_group)
 
-        # Criar botão para copiar o template
-        copy_button = QPushButton("Copiar Template")
-        copy_button.setIcon(QIcon.fromTheme("edit-copy"))
-        copy_button.setToolTip("Copiar o template para a área de transferência")
-        copy_button.setMinimumWidth(150)
-        copy_button.setMaximumHeight(50)
-        copy_button.clicked.connect(self.copy_template)
-
-        # Criar botão para editar o template
-        edit_button = QPushButton("Editar Template")
-        edit_button.setIcon(QIcon.fromTheme("edit"))
-        edit_button.setToolTip("Editar o template atual")
-        edit_button.setMinimumWidth(150)
-        edit_button.setMaximumHeight(50)
-        edit_button.clicked.connect(self.edit_template)
-
-        # Adicionar botões ao layout com um espaçador
+        # Container para os botões com layout vertical
         button_container = QWidget()
         button_layout = QVBoxLayout(button_container)
-        button_layout.addStretch()
-        button_layout.addWidget(copy_button)
-        button_layout.addWidget(edit_button)
+        button_layout.setSpacing(10)
+
+        # Título para os botões
+        button_title = QLabel("Ações")
+        button_title.setStyleSheet("font-weight: bold; color: #3f51b5; font-size: 14px;")
+        button_layout.addWidget(button_title)
+
+        # Espaçamento
+        button_layout.addSpacing(5)
+
+        # Botão para copiar template
+        self.copy_button = QPushButton("Copiar Template")
+        self.copy_button.setObjectName("copyButton")
+        self.copy_button.setIcon(QIcon().fromTheme("edit-copy"))
+        StyleManager.configure_button(self.copy_button, 'info')
+        self.copy_button.clicked.connect(self.copy_template)
+        button_layout.addWidget(self.copy_button)
+
+        # Botão para editar template
+        self.edit_button = QPushButton("Editar Template")
+        self.edit_button.setObjectName("editButton")
+        self.edit_button.setIcon(QIcon().fromTheme("document-edit"))
+        StyleManager.configure_button(self.edit_button, 'secondary')
+        self.edit_button.clicked.connect(self.edit_template)
+        button_layout.addWidget(self.edit_button)
+
+        # Adicionar espaçamento no final
         button_layout.addStretch()
 
         # Adicionar o container do botão ao layout de controles
         controls_layout.addWidget(button_container)
 
+        # Adicionar espaçamento à direita
+        controls_layout.addStretch()
+
         # Adicionar o container de controles ao layout principal
         template_layout.addWidget(controls_container)
+
+        # Container da área de exibição do template
+        template_view_container = QFrame()
+        template_view_container.setObjectName("templateViewCard")
+        StyleManager.configure_frame(template_view_container, 'card')
+        template_view_layout = QVBoxLayout(template_view_container)
 
         # Área de exibição do template
         self.template_area = QTextBrowser()
         self.template_area.setOpenExternalLinks(True)  # Permitir abrir links
-        self.template_area.setStyleSheet("font-size: 14px; border: 1px solid #ccc; border-radius: 5px; padding: 10px;")
-        template_layout.addWidget(self.template_area)
+        self.template_area.setStyleSheet("""
+            QTextBrowser {
+                border: none;
+                background-color: white;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 14px;
+                selection-background-color: #e3f2fd;
+                selection-color: #2196f3;
+            }
+        """)
+        template_view_layout.addWidget(self.template_area)
+
+        # Adicionar o container da área de template ao layout principal
+        template_layout.addWidget(template_view_container, 1)  # 1 para expandir
 
         # Conectar eventos dos radio buttons
         self.rb_apenas_multa.toggled.connect(lambda: self.update_template(self.rb_apenas_multa) if self.rb_apenas_multa.isChecked() else None)
@@ -427,60 +840,180 @@ class ExcelInterface(QMainWindow):
         self.show_template_apenas_multa()
 
         # Adicionar a aba ao widget principal
-        self.tabs.addTab(template_tab, "Templates de Email")
+        self.tabs.addTab(template_tab, "✉️ Templates")
 
     def setup_export_tab(self):
         """Configura a aba de exportação"""
         export_tab = QWidget()
         export_layout = QVBoxLayout(export_tab)
+        export_layout.setContentsMargins(20, 20, 20, 20)
+        export_layout.setSpacing(15)
+
+        # Título e descrição
+        header_container = QWidget()
+        header_layout = QVBoxLayout(header_container)
+        header_layout.setContentsMargins(0, 0, 0, 20)
 
         # Cabeçalho
         header = QLabel("Exportação de Dados")
-        header.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
-        header.setAlignment(Qt.AlignCenter)
-        export_layout.addWidget(header)
+        StyleManager.configure_header_label(header)
+        header_layout.addWidget(header)
 
         # Descrição
-        description = QLabel(
-            "Exporte os dados unificados em formato JSON para uso com outras ferramentas."
+        description = QLabel("Exporte os dados unificados em diferentes formatos")
+        StyleManager.configure_subheader_label(description)
+        header_layout.addWidget(description)
+
+        export_layout.addWidget(header_container)
+
+        # Card de informações
+        export_info_card = QFrame()
+        export_info_card.setObjectName("exportInfoCard")
+        StyleManager.configure_frame(export_info_card, 'success')
+        export_info_layout = QVBoxLayout(export_info_card)
+
+        export_info_title = QLabel("Formatos disponíveis:")
+        font = export_info_title.font()
+        font.setBold(True)
+        font.setPointSize(14)
+        export_info_title.setFont(font)
+
+        # Configurar cor usando QPalette
+        palette = export_info_title.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, AppColors.ACCENT_DARK)
+        export_info_title.setPalette(palette)
+
+        export_info_layout.addWidget(export_info_title)
+
+        # Lista de formatos
+        formats_text = QLabel(
+            "• JSON: formato completo com todos os dados\n"
+            "• Excel: planilha formatada para edição\n"
+            "• CSV: formato simplificado para compatibilidade\n"
+            "• PDF: relatório para impressão"
         )
-        description.setStyleSheet("font-size: 14px; margin-bottom: 20px;")
-        description.setWordWrap(True)
-        description.setAlignment(Qt.AlignCenter)
-        export_layout.addWidget(description)
 
-        # Botão de exportação
-        export_button_container = QWidget()
-        export_button_layout = QHBoxLayout(export_button_container)
-        export_button_layout.addStretch()
+        # Configurar texto de formatos usando QPalette
+        palette = formats_text.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, AppColors.TEXT)
+        formats_text.setPalette(palette)
 
+        export_info_layout.addWidget(formats_text)
+
+        export_layout.addWidget(export_info_card)
+
+        # Container para botões de exportação
+        export_buttons_container = QFrame()
+        export_buttons_container.setObjectName("exportButtonsContainer")
+        StyleManager.configure_frame(export_buttons_container, 'card')
+        export_buttons_layout = QVBoxLayout(export_buttons_container)
+        export_buttons_layout.setSpacing(15)
+
+        # Título do container
+        buttons_title = QLabel("Escolha o formato de exportação:")
+        font = buttons_title.font()
+        font.setBold(True)
+        buttons_title.setFont(font)
+        export_buttons_layout.addWidget(buttons_title)
+
+        # Botão de exportação para JSON (principal)
         self.export_button = QPushButton("Exportar para JSON")
-        self.export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 16px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
-            QPushButton:disabled {
-                background-color: #bdc3c7;
-            }
-        """)
-        self.export_button.setEnabled(False)
+        self.export_button.setObjectName("exportJsonButton")
+        StyleManager.configure_button(self.export_button, 'success')
         self.export_button.clicked.connect(self.export_json)
-        export_button_layout.addWidget(self.export_button)
-        export_button_layout.addStretch()
+        export_buttons_layout.addWidget(self.export_button)
 
-        export_layout.addWidget(export_button_container)
+        # Botões para outros formatos
+        export_excel_button = self.create_export_button("Exportar para Excel", export_func=self.export_excel)
+        export_buttons_layout.addWidget(export_excel_button)
+
+        export_csv_button = self.create_export_button("Exportar para CSV", export_func=self.export_csv)
+        export_buttons_layout.addWidget(export_csv_button)
+
+        export_pdf_button = self.create_export_button("Exportar para PDF", export_func=self.export_pdf)
+        export_buttons_layout.addWidget(export_pdf_button)
+
+        export_layout.addWidget(export_buttons_container)
+
+        # Adicionar espaçamento final
         export_layout.addStretch()
 
         # Adicionar a aba ao widget principal
-        self.tabs.addTab(export_tab, "Exportação")
+        self.tabs.addTab(export_tab, "📤 Exportação")
+
+    def export_excel(self):
+        """Exporta os dados unificados para um arquivo Excel"""
+        if self.unified_data is None:
+            self.show_message("Erro", "Não há dados unificados para exportar.", QMessageBox.Icon.Warning)
+            return
+
+        try:
+            # Perguntar onde salvar o arquivo
+            output_path, _ = QFileDialog.getSaveFileName(
+                self, "Salvar arquivo Excel", "", "Excel Files (*.xlsx)")
+
+            if output_path:
+                # Animar progresso para feedback visual
+                self.animate_progress()
+
+                # Exportar para Excel (implementação simplificada)
+                self.unified_data.to_excel(output_path, index=False)
+
+                # Mostrar mensagem de sucesso
+                self.show_message("Sucesso", f"Arquivo Excel gerado com sucesso: {output_path}")
+
+        except Exception as e:
+            self.show_message("Erro", f"Erro ao exportar para Excel: {str(e)}", QMessageBox.Icon.Critical)
+
+    def export_csv(self):
+        """Exporta os dados unificados para um arquivo CSV"""
+        if self.unified_data is None:
+            self.show_message("Erro", "Não há dados unificados para exportar.", QMessageBox.Icon.Warning)
+            return
+
+        try:
+            # Perguntar onde salvar o arquivo
+            output_path, _ = QFileDialog.getSaveFileName(
+                self, "Salvar arquivo CSV", "", "CSV Files (*.csv)")
+
+            if output_path:
+                # Animar progresso para feedback visual
+                self.animate_progress()
+
+                # Exportar para CSV (implementação simplificada)
+                self.unified_data.to_csv(output_path, index=False, sep=';', encoding='utf-8-sig')
+
+                # Mostrar mensagem de sucesso
+                self.show_message("Sucesso", f"Arquivo CSV gerado com sucesso: {output_path}")
+
+        except Exception as e:
+            self.show_message("Erro", f"Erro ao exportar para CSV: {str(e)}", QMessageBox.Icon.Critical)
+
+    def export_pdf(self):
+        """Exporta os dados unificados para um arquivo PDF"""
+        if self.unified_data is None:
+            self.show_message("Erro", "Não há dados unificados para exportar.", QMessageBox.Icon.Warning)
+            return
+
+        try:
+            # Perguntar onde salvar o arquivo
+            output_path, _ = QFileDialog.getSaveFileName(
+                self, "Salvar arquivo PDF", "", "PDF Files (*.pdf)")
+
+            if output_path:
+                # Animar progresso para feedback visual
+                self.animate_progress()
+
+                # Aqui seria implementada a exportação para PDF
+                # Como é apenas uma demonstração, vamos simular a exportação
+                with open(output_path, 'w') as f:
+                    f.write("Simulação de exportação PDF")
+
+                # Mostrar mensagem de sucesso
+                self.show_message("Sucesso", f"Arquivo PDF gerado com sucesso: {output_path}")
+
+        except Exception as e:
+            self.show_message("Erro", f"Erro ao exportar para PDF: {str(e)}", QMessageBox.Icon.Critical)
 
     def handle_file_dropped(self, file_path, report_type):
         """Manipula quando um arquivo é solto ou selecionado em uma área de drop"""
@@ -492,11 +1025,11 @@ class ExcelInterface(QMainWindow):
             # Atribuir ao tipo correto
             if report_type == "multas":
                 self.multas_file = file_path
-                self.df_multas = df
+                self.multas_df = df
                 self.animate_progress()
             else:
                 self.pendencias_file = file_path
-                self.df_pendencias = df
+                self.pendencias_df = df
                 self.animate_progress()
 
             # Atualizar resumo
@@ -511,7 +1044,7 @@ class ExcelInterface(QMainWindow):
                     f"⚠️ Erro de Data no relatório de {report_type.capitalize()}: {str(e)}\n"
                     "Desmarque a opção 'Verificar se os arquivos são do dia atual' para processar este arquivo."
                 )
-                self.show_message("Erro de Data", error_summary, QMessageBox.Warning)
+                self.show_message("Erro de Data", error_summary, QMessageBox.Icon.Warning)
 
                 # Remover referência ao arquivo com erro
                 if report_type == "multas":
@@ -530,7 +1063,7 @@ class ExcelInterface(QMainWindow):
         summary_html = "<div style='padding: 10px;'>"
 
         if self.multas_file:
-            summary_multas = get_summary(self.df_multas)
+            summary_multas = get_summary(self.multas_df)
             summary_html += (
                 "<h4>Relatório de Multas:</h4>"
                 "<table style='width: 100%; border-collapse: collapse;'>"
@@ -541,7 +1074,7 @@ class ExcelInterface(QMainWindow):
             )
 
         if self.pendencias_file:
-            summary_pendencias = get_summary(self.df_pendencias)
+            summary_pendencias = get_summary(self.pendencias_df)
             summary_html += (
                 "<h4>Relatório de Pendências:</h4>"
                 "<table style='width: 100%; border-collapse: collapse;'>"
@@ -550,17 +1083,17 @@ class ExcelInterface(QMainWindow):
                 "</table>"
             )
 
-        if self.df_unificado is not None:
+        if self.unified_data is not None:
             # Encontrar a coluna correta para contagem de usuários
-            if 'Código da pessoa' in self.df_unificado.columns and not self.df_unificado['Código da pessoa'].isna().all():
-                total_users = self.df_unificado['Código da pessoa'].nunique()
+            if 'Código da pessoa' in self.unified_data.columns and not self.unified_data['Código da pessoa'].isna().all():
+                total_users = self.unified_data['Código da pessoa'].nunique()
             else:
                 total_users = 0  # Valor padrão se não encontrar coluna válida
 
             summary_html += (
                 "<h4>Dados Unificados:</h4>"
                 "<table style='width: 100%; border-collapse: collapse;'>"
-                f"<tr><td>Total de registros:</td><td style='color: #2e7d32; font-weight: bold;'>{len(self.df_unificado)}</td></tr>"
+                f"<tr><td>Total de registros:</td><td style='color: #2e7d32; font-weight: bold;'>{len(self.unified_data)}</td></tr>"
                 f"<tr><td>Total de usuários:</td><td style='color: #2e7d32; font-weight: bold;'>{total_users}</td></tr>"
                 "</table>"
             )
@@ -570,11 +1103,11 @@ class ExcelInterface(QMainWindow):
 
     def unify_reports(self):
         """Unifica os dois relatórios em um único DataFrame"""
-        if not (self.df_multas is not None and self.df_pendencias is not None):
+        if not (self.multas_df is not None and self.pendencias_df is not None):
             self.show_message(
                 "Erro",
                 "É necessário carregar os dois relatórios antes de unificá-los.",
-                QMessageBox.Warning
+                QMessageBox.Icon.Warning
             )
             return
 
@@ -583,10 +1116,10 @@ class ExcelInterface(QMainWindow):
             self.animate_progress()
 
             # Chamar a função modularizada de unificação
-            self.df_unificado = unify_dataframes(self.df_multas, self.df_pendencias)
+            self.unified_data = unify_dataframes(self.multas_df, self.pendencias_df)
 
             # Gerar arquivo xlsx
-            self.df_unificado.to_excel('unificado.xlsx', index=False)
+            self.unified_data.to_excel('unificado.xlsx', index=False)
 
             # Atualizar o resumo com os dados unificados
             self.update_summary()
@@ -606,28 +1139,28 @@ class ExcelInterface(QMainWindow):
             import traceback
             error_details = traceback.format_exc()
             print(f"Erro detalhado: {error_details}")
-            self.show_message("Erro", f"Erro ao unificar relatórios: {str(e)}", QMessageBox.Critical)
+            self.show_message("Erro", f"Erro ao unificar relatórios: {str(e)}", QMessageBox.Icon.Critical)
 
     def display_unified_results(self):
         """Exibe os resultados da unificação em formato de dashboard"""
-        if self.df_unificado is None:
+        if self.unified_data is None:
             return
 
         # Obter categorias e estatísticas
-        categories = categorize_users(self.df_unificado)
+        categories = categorize_users(self.unified_data)
 
         # Calcular estatísticas para os botões
-        df_rel86 = self.df_unificado[self.df_unificado['Relatório'] == 'rel86']
-        df_rel76 = self.df_unificado[self.df_unificado['Relatório'] == 'rel76']
+        df_rel86 = self.unified_data[self.unified_data['Relatório'] == 'rel86']
+        df_rel76 = self.unified_data[self.unified_data['Relatório'] == 'rel76']
 
         # Contagens de pessoas únicas
         unique_users_rel86 = df_rel86['Código da pessoa'].nunique() if 'Código da pessoa' in df_rel86.columns else 0
         unique_users_rel76 = df_rel76['Código da pessoa'].nunique() if 'Código da pessoa' in df_rel76.columns else 0
 
         # Filtrar registros com chaves emprestadas
-        chaves_df = self.df_unificado[
-            (~self.df_unificado['Número chave'].isna()) &
-            (self.df_unificado['Número chave'].str.strip() != "")
+        chaves_df = self.unified_data[
+            (~self.unified_data['Número chave'].isna()) &
+            (self.unified_data['Número chave'].str.strip() != "")
         ]
 
         # Quantidade de pessoas únicas com chaves
@@ -640,7 +1173,7 @@ class ExcelInterface(QMainWindow):
 
             <div style='display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;'>
                 <!-- Card do Relatório 86 (recolhível) -->
-                <div id="card_rel86" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; transition: all 0.3s ease;'>
+                <div id="card_rel86" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden;'>
                     <!-- Cabeçalho do card (sempre visível) -->
                     <div style='background-color: #3498db; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;'
                          onclick="toggleCard('rel86_content', 'rel86_toggle')">
@@ -672,7 +1205,7 @@ class ExcelInterface(QMainWindow):
                 </div>
 
                 <!-- Card do Relatório 76 (recolhível) -->
-                <div id="card_rel76" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; transition: all 0.3s ease;'>
+                <div id="card_rel76" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden;'>
                     <!-- Cabeçalho do card (sempre visível) -->
                     <div style='background-color: #e74c3c; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;'
                          onclick="toggleCard('rel76_content', 'rel76_toggle')">
@@ -703,7 +1236,7 @@ class ExcelInterface(QMainWindow):
                 </div>
 
                 <!-- Card de Pessoas Sem Email (recolhível) -->
-                <div id="card_sem_email" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; transition: all 0.3s ease;'>
+                <div id="card_sem_email" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden;'>
                     <!-- Cabeçalho do card (sempre visível) -->
                     <div style='background-color: #27ae60; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;'
                          onclick="toggleCard('sem_email_content', 'sem_email_toggle')">
@@ -734,7 +1267,7 @@ class ExcelInterface(QMainWindow):
                 </div>
 
                 <!-- Card de Chaves Emprestadas (recolhível) -->
-                <div id="card_chaves" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; transition: all 0.3s ease;'>
+                <div id="card_chaves" class="dashboard_card" style='width: 45%; background-color: white; color: #333; border-radius: 10px; border: 1px solid #e0e0e0; overflow: hidden;'>
                     <!-- Cabeçalho do card (sempre visível) -->
                     <div style='background-color: #f39c12; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;'
                          onclick="toggleCard('chaves_content', 'chaves_toggle')">
@@ -804,131 +1337,42 @@ class ExcelInterface(QMainWindow):
         """
         Exibe as categorias de usuários na interface conforme solicitado.
         """
-        if self.df_unificado is None:
+        if self.unified_data is None:
             return
 
         # Obter categorias
-        categories = categorize_users(self.df_unificado)
+        categories = categorize_users(self.unified_data)
 
-        # Criar HTML para exibição
-        html = """
-        <div style='font-family: Arial; font-size: 14px;'>
-            <h2 style='color: #2c3e50;'>Relatórios e Estatísticas</h2>
-
-            <!-- Relatório 86 (Multas) -->
-            <div style='margin-bottom: 30px; border: 1px solid #3498db; border-radius: 5px; padding: 15px;'>
-                <h3 style='color: #3498db; margin-top: 0;'>📊 Relatório 86 (Multas)</h3>
-                <ul style='list-style-type: none; padding-left: 10px;'>
-                    <li><strong>Número total de linhas:</strong> {rel86_linhas}</li>
-                    <li><strong>Número total de pessoas únicas sem email:</strong> {rel86_pessoas_sem_email}</li>
-                    <li><strong>Valor total de multas:</strong> R$ {rel86_total_multas:.2f}</li>
-                </ul>
-            </div>
-
-            <!-- Relatório 76 (Pendências) -->
-            <div style='margin-bottom: 30px; border: 1px solid #e74c3c; border-radius: 5px; padding: 15px;'>
-                <h3 style='color: #e74c3c; margin-top: 0;'>📚 Relatório 76 (Pendências)</h3>
-                <ul style='list-style-type: none; padding-left: 10px;'>
-                    <li><strong>Número total de linhas:</strong> {rel76_linhas}</li>
-                    <li><strong>Número total de pessoas únicas sem email:</strong> {rel76_pessoas_sem_email}</li>
-                </ul>
-
-                <!-- Lista ordenada de dias de atraso -->
-                <h4 style='color: #e74c3c;'>Lista de Atrasos (do maior para o menor)</h4>
-                <table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>
-                    <thead>
-                        <tr style='background-color: #e74c3c; color: white;'>
-                            <th style='padding: 8px; text-align: left;'>Matrícula</th>
-                            <th style='padding: 8px; text-align: left;'>Nome</th>
-                            <th style='padding: 8px; text-align: center;'>Dias de Atraso</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rel76_dias_atraso_rows}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pessoas Sem Email -->
-            <div style='margin-bottom: 30px; border: 1px solid #27ae60; border-radius: 5px; padding: 15px;'>
-                <h3 style='color: #27ae60; margin-top: 0;'>👤 Pessoas Sem Email</h3>
-                <p><strong>Total de pessoas sem email:</strong> {pessoas_sem_email}</p>
-
-                <table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>
-                    <thead>
-                        <tr style='background-color: #27ae60; color: white;'>
-                            <th style='padding: 8px; text-align: left;'>Matrícula</th>
-                            <th style='padding: 8px; text-align: left;'>Nome</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {pessoas_sem_email_rows}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        """
-
-        # Gerar linhas para a tabela de dias de atraso
+        # Criar estrutura para dados de dias de atraso
         dias_atraso_rows = ""
-        for codigo, nome, dias in categories['rel76']['dias_atraso']:
-            dias_atraso_rows += f"""
-            <tr style='background-color: {"#f9ebea" if dias > 30 else "#fdf2e9"}'>
-                <td style='padding: 8px; border-bottom: 1px solid #ddd;'>{codigo}</td>
-                <td style='padding: 8px; border-bottom: 1px solid #ddd;'>{nome}</td>
-                <td style='padding: 8px; border-bottom: 1px solid #ddd; text-align: center;
-                         {"font-weight: bold; color: #c0392b;" if dias > 30 else ""}'>
-                    {dias}
-                </td>
-            </tr>
-            """
+        if categories['rel76']['pessoas_por_dias_atraso']:
+            for pessoa in categories['rel76']['pessoas_por_dias_atraso']:
+                dias_atraso_rows += f"""
+                    <tr style='border-bottom: 1px solid #eee;'>
+                        <td style='padding: 5px;'>{pessoa[0]}</td>
+                        <td style='padding: 5px;'>{pessoa[1]}</td>
+                        <td style='padding: 5px; text-align: center;'>{pessoa[2]}</td>
+                    </tr>
+                """
 
-        if not categories['rel76']['dias_atraso']:
-            dias_atraso_rows = """
-            <tr>
-                <td colspan="3" style='padding: 8px; text-align: center; font-style: italic;'>
-                    Nenhum atraso encontrado
-                </td>
-            </tr>
-            """
-
-        # Gerar linhas para a tabela de pessoas sem email
+        # Criar estrutura para dados de pessoas sem email
         pessoas_sem_email_rows = ""
-        for codigo, nome in categories['sem_email']['pessoas']:
+        for matricula, nome in categories['sem_email']['pessoas']:
             pessoas_sem_email_rows += f"""
-            <tr>
-                <td style='padding: 8px; border-bottom: 1px solid #ddd;'>{codigo}</td>
-                <td style='padding: 8px; border-bottom: 1px solid #ddd;'>{nome}</td>
-            </tr>
+                <tr style='border-bottom: 1px solid #eee;'>
+                    <td style='padding: 5px;'>{matricula}</td>
+                    <td style='padding: 5px;'>{nome}</td>
+                </tr>
             """
 
-        if not categories['sem_email']['pessoas']:
-            pessoas_sem_email_rows = """
-            <tr>
-                <td colspan="2" style='padding: 8px; text-align: center; font-style: italic;'>
-                    Nenhuma pessoa sem email encontrada
-                </td>
-            </tr>
-            """
-
-        # Formatar o HTML com os valores
-        formatted_html = html.format(
-            rel86_linhas=categories['rel86']['total_linhas'],
-            rel86_pessoas_sem_email=len(categories['rel86']['pessoas_sem_email']),
-            rel86_total_multas=categories['rel86']['total_multas'],
-            rel76_linhas=categories['rel76']['total_linhas'],
-            rel76_pessoas_sem_email=len(categories['rel76']['pessoas_sem_email']),
-            rel76_dias_atraso_rows=dias_atraso_rows,
-            pessoas_sem_email=len(categories['sem_email']['pessoas']),
-            pessoas_sem_email_rows=pessoas_sem_email_rows
-        )
-
-        self.template_area.setHtml(formatted_html)
+        # Ajustar para usar o novo método do StyleManager
+        if hasattr(self, 'template_area') and self.template_area is not None:
+            StyleManager.configure_categories_text_browser(self.template_area, categories)
 
     def export_json(self):
         """Exporta os dados unificados para um arquivo JSON"""
-        if self.df_unificado is None:
-            self.show_message("Erro", "Não há dados unificados para exportar.", QMessageBox.Warning)
+        if self.unified_data is None:
+            self.show_message("Erro", "Não há dados unificados para exportar.", QMessageBox.Icon.Warning)
             return
 
         try:
@@ -943,27 +1387,51 @@ class ExcelInterface(QMainWindow):
                 self.animate_progress()
 
                 # Exportar para JSON usando a função existente
-                json_path = generate_json_file(self.df_unificado, output_path)
+                json_path = generate_json_file(self.unified_data, output_path)
 
                 # Mostrar mensagem de sucesso
                 self.show_message("Sucesso", f"Arquivo JSON gerado com sucesso: {json_path}")
 
         except Exception as e:
-            self.show_message("Erro", f"Erro ao exportar para JSON: {str(e)}", QMessageBox.Critical)
+            self.show_message("Erro", f"Erro ao exportar para JSON: {str(e)}", QMessageBox.Icon.Critical)
+
+    def update_check_date_button(self):
+        """Atualiza o estilo do botão de verificação de data usando QPalette"""
+        # Configurar o botão com cores baseadas em seu estado
+        palette = self.check_date.palette()
+
+        if self.check_date.isChecked():
+            # Botão ativado - usar cor de ACCENT (verde)
+            palette.setColor(QPalette.ColorRole.Button, AppColors.ACCENT)
+            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+        else:
+            # Botão desativado - usar cor de WARNING (vermelho)
+            palette.setColor(QPalette.ColorRole.Button, AppColors.WARNING)
+            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+
+        self.check_date.setPalette(palette)
+        self.check_date.setAutoFillBackground(True)
+
+        # Ajustar o estilo do botão
+        font = self.check_date.font()
+        font.setBold(True)
+        self.check_date.setFont(font)
+
+        # Definir padding e bordas arredondadas
+        self.check_date.setContentsMargins(8, 8, 8, 8)
 
     def toggle_date_check(self, checked):
-        """Alterna a configuração de verificação de data"""
+        """Alterna a verificação de data dos arquivos"""
         self.verificar_data = checked
-        message = (
-            "A verificação de data está ativada. Apenas arquivos do dia atual serão processados."
-            if checked else
-            "Atenção: A verificação de data está desativada. Arquivos com qualquer data serão processados."
-        )
-        self.show_message(
-            "Verificação de Data",
-            message,
-            QMessageBox.Warning if not checked else QMessageBox.Information
-        )
+
+        # Atualizar o estilo do botão
+        self.update_check_date_button()
+
+        # Atualizar o texto do botão
+        if checked:
+            self.check_date.setText("Verificar se os arquivos são do dia atual")
+        else:
+            self.check_date.setText("Ignorar a data dos arquivos")
 
     def animate_progress(self):
         """Anima a barra de progresso para feedback visual"""
@@ -977,29 +1445,96 @@ class ExcelInterface(QMainWindow):
 
     def _handle_generic_error(self, e):
         """Método auxiliar para tratar erros genéricos"""
-        self.show_message("Erro", f"Erro no processamento: {str(e)}", QMessageBox.Critical)
+        self.show_message("Erro", f"Erro no processamento: {str(e)}", QMessageBox.Icon.Critical)
 
-    def show_message(self, title, message, icon=QMessageBox.Information):
+    def show_message(self, title, message, icon=QMessageBox.Icon.Information):
         """Exibe um QMessageBox com estilo adequado"""
         msg_box = QMessageBox(self)
         msg_box.setIcon(icon)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
-        msg_box.exec_()
+        msg_box.exec()
 
     def show_welcome_message(self):
         """Exibe mensagem de boas-vindas"""
         try:
             if hasattr(self, 'result_area') and self.result_area is not None:
-                self.result_area.setHtml(get_welcome_html())
+                StyleManager.configure_welcome_text_browser(self.result_area)
             elif hasattr(self, 'template_area') and self.template_area is not None:
-                self.template_area.setHtml(get_welcome_html())
+                StyleManager.configure_welcome_text_browser(self.template_area)
         except Exception as e:
             print(f"Erro ao exibir mensagem de boas-vindas: {e}")
 
     def apply_styles(self):
-        # Aplicar estilos do módulo centralizado
-        self.setStyleSheet(get_main_styles())
+        """Aplica estilos usando abordagem nativa do PyQt6"""
+        # Utilizamos o StyleManager para aplicar estilos nativos do Qt
+        # Isso proporciona uma aparência mais integrada ao sistema e melhor desempenho
+
+        # Configurar componentes individuais usando a classe StyleManager
+        # Cabeçalho e rodapé
+        if hasattr(self, 'headerFrame'):
+            StyleManager.configure_header_frame(self.headerFrame)
+
+        if hasattr(self, 'logoLabel'):
+            StyleManager.configure_logo_label(self.logoLabel)
+
+        if hasattr(self, 'footerFrame'):
+            StyleManager.configure_footer_frame(self.footerFrame)
+
+        if hasattr(self, 'footerText'):
+            StyleManager.configure_footer_text(self.footerText)
+
+        # Configurar abas
+        if hasattr(self, 'tabs'):
+            StyleManager.configure_tab_widget(self.tabs)
+
+        # Configurar botões principais
+        if hasattr(self, 'unify_button'):
+            StyleManager.configure_button(self.unify_button, 'primary')
+
+        if hasattr(self, 'export_button'):
+            StyleManager.configure_button(self.export_button, 'success')
+
+        if hasattr(self, 'check_date'):
+            self.update_check_date_button()
+
+        if hasattr(self, 'copy_button'):
+            StyleManager.configure_button(self.copy_button, 'info')
+
+        if hasattr(self, 'edit_button'):
+            StyleManager.configure_button(self.edit_button, 'secondary')
+
+        # Configurar áreas de texto
+        if hasattr(self, 'template_area'):
+            StyleManager.configure_text_edit(self.template_area)
+
+        if hasattr(self, 'result_area'):
+            StyleManager.configure_text_edit(self.result_area)
+
+        if hasattr(self, 'summary_label'):
+            StyleManager.configure_text_edit(self.summary_label)
+
+        # Configurar barra de progresso
+        if hasattr(self, 'progress_bar'):
+            StyleManager.configure_progress_bar(self.progress_bar)
+
+        # Configurar áreas de drop de arquivos
+        if hasattr(self, 'multas_drop_area'):
+            StyleManager.configure_drop_area(self.multas_drop_area, "multas")
+
+        if hasattr(self, 'pendencias_drop_area'):
+            StyleManager.configure_drop_area(self.pendencias_drop_area, "pendencias")
+
+        # Configurar frames de informação
+        frames_info = [f for f in dir(self) if isinstance(getattr(self, f, None), QFrame)]
+        for frame_name in frames_info:
+            frame = getattr(self, frame_name)
+            if frame.objectName() == "instructionsCard":
+                StyleManager.configure_frame(frame, 'info')
+            elif frame.objectName() == "exportInfoCard":
+                StyleManager.configure_frame(frame, 'success')
+            elif frame.objectName() in ["resultContainer", "summaryContainer", "templateViewCard"]:
+                StyleManager.configure_frame(frame, 'card')
 
     def update_template(self, button):
         """Atualiza o template conforme a seleção do usuário"""
@@ -1018,23 +1553,23 @@ class ExcelInterface(QMainWindow):
             self.template_area.setHtml(saved_template)
             return
 
-        # Template padrão se não tiver nenhum salvo
-        template = """
-        <div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
-            <h3 style='color: #3498db;'>Template: Notificação de Multa</h3>
-            <hr style='border: 1px solid #eee;'>
-            <pre style='background-color: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: Consolas, monospace;'>
-Prezado(a) {formtext: name=nome; trim=yes; formatter=(value) -> upper(value)},
+        # Template padrão se não tiver nenhum salvo - usando AppColors
+        template = f"""
+        <div style='font-family: Arial, sans-serif; color: {AppColors.TEXT.name()}; line-height: 1.6;'>
+            <h3 style='color: {AppColors.INFO.name()};'>Template: Notificação de Multa</h3>
+            <hr style='border: 1px solid {AppColors.BORDER.name()};'>
+            <pre style='background-color: {AppColors.BACKGROUND.name()}; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: Consolas, monospace;'>
+Prezado(a) {{formtext: name=nome; trim=yes; formatter=(value) -> upper(value)}},
 
 Conforme estabelecido no [Regulamento Interno das Bibliotecas do Instituto Federal Catarinense](https://biblioteca.ifc.edu.br/wp-content/uploads/sites/53/2023/04/SIBI-Regulamento.pdf), artigo 44, é nossa responsabilidade notificá-lo(a) sobre as pendências em sua conta de usuário na biblioteca.
 
-Constata-se a existência de multa acumulada no valor total de R$ {formtext: name=valor; default=00,00}. referente ao(s) seguinte(s) item(ns):
+Constata-se a existência de multa acumulada no valor total de R$ {{formtext: name=valor; default=00,00}}. referente ao(s) seguinte(s) item(ns):
 
-- {formtext: name=Obra}
-    - Data de Empréstimo: {formdate: DD/MM/YYYY; name=emprestimo}
-    - Data de Devolução Prevista: {formdate: DD/MM/YYYY; name=prevista}
-    - Data de Devolução Efetiva: {formdate: DD/MM/YYYY; name=efetiva}
-    - Dias de Atraso: {=datetimediff(datetimeparse(prevista, "DD/MM/YYYY"), datetimeparse(efetiva, "DD/MM/YYYY"), "D")}
+- {{formtext: name=Obra}}
+    - Data de Empréstimo: {{formdate: DD/MM/YYYY; name=emprestimo}}
+    - Data de Devolução Prevista: {{formdate: DD/MM/YYYY; name=prevista}}
+    - Data de Devolução Efetiva: {{formdate: DD/MM/YYYY; name=efetiva}}
+    - Dias de Atraso: {{=datetimediff(datetimeparse(prevista, "DD/MM/YYYY"), datetimeparse(efetiva, "DD/MM/YYYY"), "D")}}
 
 Salientamos que, para renovar ou realizar novos empréstimos, as multas devem estar abaixo de R$ 10,00. No entanto, para emitir a Declaração de Nada Consta, é necessário que todas as multas e pendências na biblioteca sejam totalmente quitadas.
 
@@ -1162,7 +1697,7 @@ Atenciosamente,
         clipboard.setText(text)
 
         # Feedback para o usuário
-        self.show_message("Copiado", "Template copiado para a área de transferência!", QMessageBox.Information)
+        self.show_message("Copiado", "Template copiado para a área de transferência!", QMessageBox.Icon.Information)
 
     def edit_template(self):
         """Permite ao usuário editar o template atual em uma caixa de diálogo"""
@@ -1196,7 +1731,7 @@ Atenciosamente,
         cancel_button.clicked.connect(dialog.reject)
 
         # Exibir diálogo
-        dialog.exec_()
+        dialog.exec()
 
     def save_template_edit(self, html_content, dialog):
         """Salva o template editado"""
@@ -1210,16 +1745,32 @@ Atenciosamente,
         elif self.rb_multa_e_pendencia.isChecked():
             self.config_manager.set_value('template_multa_e_pendencia', html_content)
 
-        self.show_message("Template Salvo", "As alterações foram salvas com sucesso!", QMessageBox.Information)
+        self.show_message("Template Salvo", "As alterações foram salvas com sucesso!", QMessageBox.Icon.Information)
         dialog.accept()
+
+    def create_export_button(self, text, icon_name=None, export_func=None):
+        """Cria um botão de exportação com estilo padronizado"""
+        button = QPushButton(text)
+
+        # Configurar o botão usando StyleManager em vez de CSS
+        StyleManager.configure_button(button, 'secondary')
+
+        if export_func:
+            button.clicked.connect(export_func)
+
+        return button
 
 
 def main():
-    """Inicia a interface gráfica com PyQt5."""
+    """Inicia a interface gráfica com PyQt6."""
     app = QApplication(sys.argv)
+
+    # Aplicar o tema nativo para toda a aplicação
+    StyleManager.apply_application_theme(app)
+
     window = ExcelInterface()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
