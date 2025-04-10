@@ -117,6 +117,22 @@ def unify_dataframes(df_multas, df_pendencias):
     Returns:
         DataFrame unificado contendo dados de ambos os relatórios
     """
+    # Código de diagnóstico para verificar a estrutura dos dataframes de entrada
+    print("Diagnóstico da função unify_dataframes:")
+    print(f"DataFrame de multas: {len(df_multas)} registros")
+    if 'Número chave' in df_multas.columns:
+        num_chaves_multas = (~df_multas['Número chave'].isna() & df_multas['Número chave'].astype(str).str.strip().ne('')).sum()
+        print(f"Registros com chaves no DataFrame de multas: {num_chaves_multas}")
+        if num_chaves_multas > 0:
+            print("Exemplo de chaves:", df_multas.loc[~df_multas['Número chave'].isna(), 'Número chave'].iloc[:3].tolist())
+
+    print(f"DataFrame de pendências: {len(df_pendencias)} registros")
+    if 'Número chave' in df_pendencias.columns:
+        num_chaves_pendencias = (~df_pendencias['Número chave'].isna() & df_pendencias['Número chave'].astype(str).str.strip().ne('')).sum()
+        print(f"Registros com chaves no DataFrame de pendências: {num_chaves_pendencias}")
+        if num_chaves_pendencias > 0:
+            print("Exemplo de chaves:", df_pendencias.loc[~df_pendencias['Número chave'].isna(), 'Número chave'].iloc[:3].tolist())
+
     # Colunas a manter na unificação
     colunas_essenciais = [
         'Código da pessoa',
@@ -179,6 +195,29 @@ def unify_dataframes(df_multas, df_pendencias):
     # Selecionar apenas as colunas essenciais
     df_multas_filtered = df_multas_temp[colunas_essenciais].copy()
     df_pendencias_filtered = df_pendencias_temp[colunas_essenciais].copy()
+
+    # Modificar os dados do DataFrame para tratar as chaves
+    # Para registros onde 'Número chave' não está vazio, ajustar o título e datas
+    for df in [df_multas_filtered, df_pendencias_filtered]:
+        mask_chave = (~df['Número chave'].isna()) & (df['Número chave'].astype(str).str.strip() != "")
+
+        if mask_chave.any():
+            print(f"Encontrados {mask_chave.sum()} registros com chaves.")
+
+            # Para títulos vazios, usar apenas "Chave: número" como título
+            mask_titulo_vazio = mask_chave & (df['Título'].isna() | df['Título'].astype(str).str.strip().eq(''))
+            df.loc[mask_titulo_vazio, 'Título'] = "Chave: " + df.loc[mask_titulo_vazio, 'Número chave'].astype(str)
+
+            # Para títulos não vazios, concatenar o número da chave
+            mask_titulo_nao_vazio = mask_chave & ~mask_titulo_vazio
+            df.loc[mask_titulo_nao_vazio, 'Título'] = df.loc[mask_titulo_nao_vazio, 'Título'] + " - Chave: " + df.loc[mask_titulo_nao_vazio, 'Número chave'].astype(str)
+
+            # Fazer data de empréstimo igual à data de devolução prevista para registros com chave
+            df.loc[mask_chave, 'Data de empréstimo'] = df.loc[mask_chave, 'Data devolução prevista']
+
+            print("Títulos e datas de empréstimo atualizados para registros com chaves.")
+        else:
+            print("Nenhum registro com chave encontrado.")
 
     # Corrigir problema de colunas duplicadas
     # Verificar se há colunas duplicadas e renomeá-las se necessário
