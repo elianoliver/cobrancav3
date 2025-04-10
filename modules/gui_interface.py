@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 import pandas as pd
 
 # Importar as novas classes modularizadas
-from modules.tabs import BaseTab, ImportTab, ResultsTab, SummaryTab, TemplateTab, ExportTab
+from modules.tabs import BaseTab, ImportTab, ResultsTab, TemplateTab, ExportTab, EmailTab
 from modules.read_excel import unify_dataframes
 from modules.styles_fix import get_main_styles, StyleManager, AppColors
 from modules.data_processor import generate_json_file, filter_users_by_category, categorize_users
@@ -178,30 +178,20 @@ class ExcelInterface(QMainWindow):
         self.footerText = footer_text
 
     def setup_tabs(self):
-        """Configura todas as abas da aplicação utilizando as classes modularizadas"""
-        # Instanciar e configurar a aba de importação
-        self.import_tab = ImportTab(self)
-        self.import_tab.files_loaded.connect(self.handle_files_loaded)
-        self.import_tab.unify_requested.connect(self.unify_reports)
-        self.import_tab.request_animate_progress.connect(self.animate_progress)
-        self.import_tab.show_message.connect(self.show_message)
-        self.tabs.addTab(self.import_tab, "📥 Importação")
+        """Configura as abas da aplicação."""
+        # Usar a função de configuração das abas do módulo tabs
+        from modules.tabs import setup_tabs
+        self.all_tabs = setup_tabs(self)
 
-        # Instanciar e configurar a aba de resultados
-        self.results_tab = ResultsTab(self)
-        self.results_tab.request_animate_progress.connect(self.animate_progress)
-        self.results_tab.show_message.connect(self.show_message)
-        self.tabs.addTab(self.results_tab, "📊 Resultados")
+        # Criar referências diretas para cada aba para facilitar o acesso
+        self.import_tab = self.all_tabs[0]
+        self.results_tab = self.all_tabs[1]
+        self.export_tab = self.all_tabs[2]
+        self.template_tab = self.all_tabs[3]
+        self.email_tab = self.all_tabs[4]
 
-        # Instanciar e configurar a aba de resumo
-        # self.summary_tab = SummaryTab(self)
-        # self.summary_tab.request_animate_progress.connect(self.animate_progress)
-        # self.summary_tab.show_message.connect(self.show_message)
-        # self.tabs.addTab(self.summary_tab, "📋 Resumo")
-
-        # Adicionar as abas restantes
-        self.setup_template_tab()
-        self.setup_export_tab()
+        # Selecionar a primeira aba por padrão
+        self.tabs.setCurrentIndex(0)
 
     def animate_tab_change(self, index):
         """Anima a mudança de abas para uma experiência mais suave"""
@@ -220,9 +210,6 @@ class ExcelInterface(QMainWindow):
         self.pendencias_df = pendencias_df
         self.multas_file = multas_file
         self.pendencias_file = pendencias_file
-
-        # Atualizar a aba de resumo com os novos dados
-        # self.summary_tab.update_data(multas_df=multas_df, pendencias_df=pendencias_df)
 
     def unify_reports(self):
         """Unifica os dois relatórios em um único DataFrame"""
@@ -244,16 +231,15 @@ class ExcelInterface(QMainWindow):
             # Gerar arquivo xlsx
             self.unified_data.to_excel('unificado.xlsx', index=False)
 
-            # Atualizar o resumo com os dados unificados
-            # self.summary_tab.update_data(unified_data=self.unified_data)
+            # Atualizar todas as abas com os dados unificados
+            if hasattr(self, 'results_tab'):
+                self.results_tab.update_data(self.unified_data)
 
-            # Atualizar a aba de resultados
-            self.results_tab.update_data(self.unified_data)
-
-            # Mostrar template padrão (Apenas Multa)
-            # [Será implementado quando configurarmos a aba de templates]
             if hasattr(self, 'template_tab'):
                 self.template_tab.update_data(self.unified_data)
+
+            if hasattr(self, 'email_tab'):
+                self.email_tab.update_data(self.unified_data)
 
             # Habilitar a aba de exportação
             if hasattr(self, 'export_tab'):
@@ -299,7 +285,8 @@ class ExcelInterface(QMainWindow):
         """Exibe mensagem de boas-vindas"""
         try:
             # Mostrar mensagem de boas-vindas na aba de resultados
-            self.results_tab.show_welcome_message()
+            if hasattr(self, 'results_tab'):
+                self.results_tab.show_welcome_message()
         except Exception as e:
             print(f"Erro ao exibir mensagem de boas-vindas: {e}")
 
@@ -361,6 +348,12 @@ class ExcelInterface(QMainWindow):
         # Aqui podemos realizar qualquer ação necessária quando a exportação é concluída
         # Por exemplo, mostrar uma mensagem adicional ou atualizar estatísticas
         print(f"Exportação concluída: {format_type} -> {file_path}")
+        # Podemos adicionar alguma lógica adicional posteriormente, se necessário
+
+    def handle_email_sent(self, count):
+        """Manipula o evento quando os emails são enviados."""
+        print(f"Emails enviados: {count}")
+        self.statusBar().showMessage(f"{count} emails enviados com sucesso!", 5000)
         # Podemos adicionar alguma lógica adicional posteriormente, se necessário
 
 def main():

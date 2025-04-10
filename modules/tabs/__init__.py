@@ -8,9 +8,9 @@ Estrutura do pacote:
 - base_tab.py: Classe base abstrata que todas as abas herdam
 - import_tab.py: Aba de importação de arquivos Excel
 - results_tab.py: Aba de exibição de resultados da unificação
-- summary_tab.py: Aba de resumo dos dados
 - template_tab.py: Aba de configuração de templates de e-mail
 - export_tab.py: Aba de exportação de dados em diversos formatos
+- email_tab.py: Aba de envio de emails com templates personalizados
 
 Cada aba implementa sua própria interface gráfica e lógica de
 negócios específica, enquanto herda funcionalidades comuns da classe
@@ -25,15 +25,70 @@ parte específica da interface e suas funcionalidades.
 from modules.tabs.base_tab import BaseTab
 from modules.tabs.import_tab import ImportTab
 from modules.tabs.results_tab import ResultsTab
-from modules.tabs.summary_tab import SummaryTab
-from modules.tabs.template_tab import TemplateTab
 from modules.tabs.export_tab import ExportTab
+from modules.tabs.template_tab import TemplateTab
+from modules.tabs.email_tab import EmailTab
 
 __all__ = [
     'BaseTab',
     'ImportTab',
     'ResultsTab',
-    'SummaryTab',
-    'TemplateTab',
     'ExportTab',
+    'TemplateTab',
+    'EmailTab'
 ]
+
+def setup_tabs(main_interface):
+    """
+    Configura todas as abas da aplicação e as conecta à interface principal.
+
+    Args:
+        main_interface: Referência à interface principal
+
+    Returns:
+        Uma lista com instâncias de todas as abas configuradas
+    """
+    # Instanciar e configurar as abas
+    tabs = []
+
+    # Aba de importação
+    import_tab = ImportTab(main_interface)
+    import_tab.files_loaded.connect(main_interface.handle_files_loaded)
+    import_tab.unify_requested.connect(main_interface.unify_reports)
+    import_tab.request_animate_progress.connect(main_interface.animate_progress)
+    import_tab.show_message.connect(main_interface.show_message)
+    main_interface.tabs.addTab(import_tab, "📤 Importação")
+    tabs.append(import_tab)
+
+    # Aba de resultados
+    results_tab = ResultsTab(main_interface)
+    results_tab.request_animate_progress.connect(main_interface.animate_progress)
+    results_tab.show_message.connect(main_interface.show_message)
+    main_interface.tabs.addTab(results_tab, "📊 Resultados")
+    tabs.append(results_tab)
+
+    # Aba de exportação
+    export_tab = ExportTab(main_interface)
+    export_tab.request_animate_progress.connect(main_interface.animate_progress)
+    export_tab.show_message.connect(main_interface.show_message)
+    export_tab.export_completed.connect(main_interface.handle_export_completed)
+    main_interface.tabs.addTab(export_tab, "💾 Exportação")
+    tabs.append(export_tab)
+
+    # Aba de templates
+    template_tab = TemplateTab(main_interface)
+    template_tab.request_animate_progress.connect(main_interface.animate_progress)
+    template_tab.show_message.connect(main_interface.show_message)
+    template_tab.templates_updated.connect(main_interface.handle_templates_updated)
+    main_interface.tabs.addTab(template_tab, "📝 Templates")
+    tabs.append(template_tab)
+
+    # Aba de emails
+    email_tab = EmailTab(main_interface)
+    email_tab.request_animate_progress.connect(main_interface.animate_progress)
+    email_tab.show_message.connect(main_interface.show_message)
+    email_tab.email_sent.connect(lambda count: main_interface.handle_email_sent(count))
+    main_interface.tabs.addTab(email_tab, "✉️ Emails")
+    tabs.append(email_tab)
+
+    return tabs
