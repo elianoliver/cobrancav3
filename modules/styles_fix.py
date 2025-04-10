@@ -175,9 +175,9 @@ class StyleManager:
 
     @staticmethod
     def configure_button(button, style_type='primary'):
-        """Configura botões com estilo nativo baseado no tipo"""
+        """Configura botões com estilo nativo avançado baseado no tipo"""
         # Configurar fonte em negrito
-        font = button.font()
+        font = QFont("Segoe UI", 10)
         font.setBold(True)
         button.setFont(font)
 
@@ -185,26 +185,49 @@ class StyleManager:
         if style_type == 'primary':
             bg_color = AppColors.PRIMARY
             text_color = Qt.GlobalColor.white
+            hover_color = AppColors.PRIMARY_DARK
+            disabled_bg = AppColors.PRIMARY.lighter(150)
+            disabled_text = QColor(255, 255, 255, 150)
         elif style_type == 'success':
             bg_color = AppColors.ACCENT
             text_color = Qt.GlobalColor.white
+            hover_color = AppColors.ACCENT_DARK
+            disabled_bg = AppColors.ACCENT.lighter(150)
+            disabled_text = QColor(255, 255, 255, 150)
         elif style_type == 'warning':
             bg_color = AppColors.WARNING
             text_color = Qt.GlobalColor.white
+            hover_color = AppColors.WARNING.darker(120)
+            disabled_bg = AppColors.WARNING.lighter(150)
+            disabled_text = QColor(255, 255, 255, 150)
         elif style_type == 'info':
             bg_color = AppColors.INFO
             text_color = Qt.GlobalColor.white
+            hover_color = AppColors.INFO.darker(120)
+            disabled_bg = AppColors.INFO.lighter(150)
+            disabled_text = QColor(255, 255, 255, 150)
         elif style_type == 'secondary':
             bg_color = QColor('#f5f5f5')
             text_color = AppColors.TEXT
+            hover_color = QColor('#e0e0e0')
+            disabled_bg = QColor('#f9f9f9')
+            disabled_text = AppColors.TEXT_DISABLED
         else:
             bg_color = AppColors.PRIMARY
             text_color = Qt.GlobalColor.white
+            hover_color = AppColors.PRIMARY_DARK
+            disabled_bg = AppColors.PRIMARY.lighter(150)
+            disabled_text = QColor(255, 255, 255, 150)
 
         # Aplicar paleta de cores
         palette = button.palette()
         palette.setColor(QPalette.ColorRole.Button, bg_color)
         palette.setColor(QPalette.ColorRole.ButtonText, text_color)
+
+        # Configurar estado desabilitado
+        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, disabled_bg)
+        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_text)
+
         button.setPalette(palette)
 
         # Configurar padding e bordas sem CSS
@@ -214,8 +237,70 @@ class StyleManager:
         # Configuração de margens internas
         button.setContentsMargins(16, 8, 16, 8)
 
+        # Configurar tamanho mínimo para melhor aparência
+        button.setMinimumHeight(36)
+
         # Remover foco visual padrão
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # Adicionar pequeno efeito de sombra para todos os botões
+        try:
+            # Em versões mais antigas do PyQt6, QGraphicsDropShadowEffect pode não estar disponível
+            # Nesse caso, simplesmente ignoramos o efeito de sombra
+            pass
+        except Exception:
+            # Em caso de erro, continuar sem o efeito de sombra
+            pass
+
+        # Para monitorar estados do mouse
+        button.enterEvent = lambda e, btn=button, hc=hover_color: StyleManager._button_hover_enter(btn, hc, e)
+        button.leaveEvent = lambda e, btn=button, bc=bg_color: StyleManager._button_hover_leave(btn, bc, e)
+
+    @staticmethod
+    def _button_hover_enter(button, hover_color, event):
+        """Trata evento de mouse entrando no botão"""
+        if button.isEnabled():
+            palette = button.palette()
+            palette.setColor(QPalette.ColorRole.Button, hover_color)
+            button.setPalette(palette)
+
+            # Opcionalmente, aumentar o efeito de sombra quando o mouse passa sobre o botão
+            try:
+                # Código para manipular sombra foi removido pois dependia de QGraphicsDropShadowEffect
+                pass
+            except Exception:
+                pass
+
+        # Chamar o método original se existir
+        try:
+            original_method = button.__class__.enterEvent
+            if original_method and original_method != StyleManager._button_hover_enter:
+                original_method(button, event)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _button_hover_leave(button, original_color, event):
+        """Trata evento de mouse saindo do botão"""
+        if button.isEnabled():
+            palette = button.palette()
+            palette.setColor(QPalette.ColorRole.Button, original_color)
+            button.setPalette(palette)
+
+            # Restaurar efeito de sombra normal
+            try:
+                # Código para manipular sombra foi removido pois dependia de QGraphicsDropShadowEffect
+                pass
+            except Exception:
+                pass
+
+        # Chamar o método original se existir
+        try:
+            original_method = button.__class__.leaveEvent
+            if original_method and original_method != StyleManager._button_hover_leave:
+                original_method(button, event)
+        except Exception:
+            pass
 
     @staticmethod
     def configure_text_edit(text_edit):

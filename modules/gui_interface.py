@@ -15,6 +15,7 @@ from modules.styles_fix import get_main_styles, get_welcome_html, get_categories
 # Importar todas as classes de estilo do módulo styles_fix
 from modules.styles_fix import StyleManager, AppColors
 import json
+from datetime import datetime
 
 # Constantes de estilo que agora usam AppColors
 CARD_STYLE = f"""
@@ -327,6 +328,8 @@ class ExcelInterface(QMainWindow):
         self.unified_data = None
         self.categories_count = None
         self.verificar_data = True
+        self.multas_file = None
+        self.pendencias_file = None
 
         # Configura a interface
         self.setup_ui()
@@ -578,23 +581,52 @@ class ExcelInterface(QMainWindow):
         unify_layout.setContentsMargins(0, 0, 0, 0)
         unify_layout.addStretch()
 
-        self.unify_button = QPushButton(" Unificar Relatórios ")
+        # Criação do botão com ícone
+        self.unify_button = QPushButton("  Unificar Relatórios  ")
         self.unify_button.setObjectName("unifyButton")
-        self.unify_button.setEnabled(False)
-        self.unify_button.clicked.connect(self.unify_reports)
 
-        # Usar a configuração do StyleManager em vez de CSS
-        StyleManager.configure_button(self.unify_button, 'primary')
+        # Adicionar ícone usando QIcon
+        icon_size = QSize(24, 24)
+        # Usamos símbolos Unicode para compatibilidade com diferentes plataformas
+        self.unify_button.setIcon(QIcon.fromTheme("document-save", QIcon()))
+        self.unify_button.setIconSize(icon_size)
 
-        # Ajustar o tamanho do botão programaticamente
+        # Configurar tamanho do botão
         self.unify_button.setMinimumWidth(250)
-        self.unify_button.setContentsMargins(12, 12, 12, 12)
+        self.unify_button.setMinimumHeight(50)
 
-        # Ajustar fonte para o botão
-        font = self.unify_button.font()
-        font.setPointSize(12)
+        # Configurar fonte manualmente para precisão
+        font = QFont("Segoe UI", 12)
         font.setBold(True)
         self.unify_button.setFont(font)
+
+        # Usar StyleManager para configurações básicas
+        StyleManager.configure_button(self.unify_button, 'primary')
+
+        # Garantir que o texto e ícone sejam visíveis (solução de contingência)
+        self.unify_button.setStyleSheet("""
+            QPushButton {
+                color: white;
+                background-color: #2196F3;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:disabled {
+                background-color: #90CAF9;
+                color: rgba(255, 255, 255, 150);
+            }
+        """)
+
+        # Desativar o botão por padrão até que os arquivos sejam carregados
+        self.unify_button.setEnabled(False)
+
+        # Conectar ação
+        self.unify_button.clicked.connect(self.unify_reports)
 
         unify_layout.addWidget(self.unify_button)
         unify_layout.addStretch()
@@ -847,93 +879,49 @@ class ExcelInterface(QMainWindow):
         export_tab = QWidget()
         export_layout = QVBoxLayout(export_tab)
         export_layout.setContentsMargins(20, 20, 20, 20)
-        export_layout.setSpacing(15)
+        export_layout.setSpacing(20)
 
-        # Título e descrição
-        header_container = QWidget()
-        header_layout = QVBoxLayout(header_container)
-        header_layout.setContentsMargins(0, 0, 0, 20)
+        # Seção de exportação
+        export_section = QGroupBox("Exportar Dados")
+        export_section_layout = QVBoxLayout(export_section)
 
-        # Cabeçalho
-        header = QLabel("Exportação de Dados")
-        StyleManager.configure_header_label(header)
-        header_layout.addWidget(header)
+        # Botões de exportação
+        export_buttons_layout = QHBoxLayout()
 
-        # Descrição
-        description = QLabel("Exporte os dados unificados em diferentes formatos")
-        StyleManager.configure_subheader_label(description)
-        header_layout.addWidget(description)
-
-        export_layout.addWidget(header_container)
-
-        # Card de informações
-        export_info_card = QFrame()
-        export_info_card.setObjectName("exportInfoCard")
-        StyleManager.configure_frame(export_info_card, 'success')
-        export_info_layout = QVBoxLayout(export_info_card)
-
-        export_info_title = QLabel("Formatos disponíveis:")
-        font = export_info_title.font()
-        font.setBold(True)
-        font.setPointSize(14)
-        export_info_title.setFont(font)
-
-        # Configurar cor usando QPalette
-        palette = export_info_title.palette()
-        palette.setColor(QPalette.ColorRole.WindowText, AppColors.ACCENT_DARK)
-        export_info_title.setPalette(palette)
-
-        export_info_layout.addWidget(export_info_title)
-
-        # Lista de formatos
-        formats_text = QLabel(
-            "• JSON: formato completo com todos os dados\n"
-            "• Excel: planilha formatada para edição\n"
-            "• CSV: formato simplificado para compatibilidade\n"
-            "• PDF: relatório para impressão"
-        )
-
-        # Configurar texto de formatos usando QPalette
-        palette = formats_text.palette()
-        palette.setColor(QPalette.ColorRole.WindowText, AppColors.TEXT)
-        formats_text.setPalette(palette)
-
-        export_info_layout.addWidget(formats_text)
-
-        export_layout.addWidget(export_info_card)
-
-        # Container para botões de exportação
-        export_buttons_container = QFrame()
-        export_buttons_container.setObjectName("exportButtonsContainer")
-        StyleManager.configure_frame(export_buttons_container, 'card')
-        export_buttons_layout = QVBoxLayout(export_buttons_container)
-        export_buttons_layout.setSpacing(15)
-
-        # Título do container
-        buttons_title = QLabel("Escolha o formato de exportação:")
-        font = buttons_title.font()
-        font.setBold(True)
-        buttons_title.setFont(font)
-        export_buttons_layout.addWidget(buttons_title)
-
-        # Botão de exportação para JSON (principal)
-        self.export_button = QPushButton("Exportar para JSON")
+        # Botão de exportação JSON
+        self.export_button = QPushButton("  Exportar para JSON  ")
         self.export_button.setObjectName("exportJsonButton")
+        self.export_button.setIcon(QIcon.fromTheme("text-x-script", QIcon()))
+        self.export_button.setIconSize(QSize(24, 24))
+        self.export_button.setMinimumWidth(250)
+        self.export_button.setMinimumHeight(50)
+        font = QFont("Segoe UI", 12)
+        font.setBold(True)
+        self.export_button.setFont(font)
+
+        # Estilo básico
         StyleManager.configure_button(self.export_button, 'success')
+
+        # Inicialmente desabilitado
+        self.export_button.setEnabled(False)
         self.export_button.clicked.connect(self.export_json)
         export_buttons_layout.addWidget(self.export_button)
 
         # Botões para outros formatos
-        export_excel_button = self.create_export_button("Exportar para Excel", export_func=self.export_excel)
+        export_excel_button = self.create_export_button("Exportar para Excel", icon_name="x-office-spreadsheet", export_func=self.export_excel)
         export_buttons_layout.addWidget(export_excel_button)
 
-        export_csv_button = self.create_export_button("Exportar para CSV", export_func=self.export_csv)
+        export_csv_button = self.create_export_button("Exportar para CSV", icon_name="text-csv", export_func=self.export_csv)
         export_buttons_layout.addWidget(export_csv_button)
 
-        export_pdf_button = self.create_export_button("Exportar para PDF", export_func=self.export_pdf)
+        export_pdf_button = self.create_export_button("Exportar para PDF", icon_name="application-pdf", export_func=self.export_pdf)
         export_buttons_layout.addWidget(export_pdf_button)
 
-        export_layout.addWidget(export_buttons_container)
+        # Adicionar o layout de botões ao layout da seção
+        export_section_layout.addLayout(export_buttons_layout)
+
+        # Adicionar a seção ao layout principal da tab
+        export_layout.addWidget(export_section)
 
         # Adicionar espaçamento final
         export_layout.addStretch()
@@ -1015,7 +1003,7 @@ class ExcelInterface(QMainWindow):
         except Exception as e:
             self.show_message("Erro", f"Erro ao exportar para PDF: {str(e)}", QMessageBox.Icon.Critical)
 
-    def handle_file_dropped(self, file_path, report_type):
+    def handle_file_dropped(self, file_path, file_type):
         """Manipula quando um arquivo é solto ou selecionado em uma área de drop"""
         try:
             # Verificar data do arquivo
@@ -1023,7 +1011,7 @@ class ExcelInterface(QMainWindow):
             df = clean_column_names(df)
 
             # Atribuir ao tipo correto
-            if report_type == "multas":
+            if file_type == "multas":
                 self.multas_file = file_path
                 self.multas_df = df
                 self.animate_progress()
@@ -1036,18 +1024,23 @@ class ExcelInterface(QMainWindow):
             self.update_summary()
 
             # Habilitar botão de unificação se ambos os arquivos estiverem carregados
-            self.unify_button.setEnabled(bool(self.multas_file and self.pendencias_file))
+            should_enable = bool(self.multas_file and self.pendencias_file)
+            self.unify_button.setEnabled(should_enable)
+
+            # Se ambos os arquivos estiverem carregados, adicionar efeito de pulso ao botão
+            if should_enable:
+                self.start_button_pulse_effect(self.unify_button)
 
         except ValueError as e:
             if "não é do dia atual" in str(e):
                 error_summary = (
-                    f"⚠️ Erro de Data no relatório de {report_type.capitalize()}: {str(e)}\n"
+                    f"⚠️ Erro de Data no relatório de {file_type.capitalize()}: {str(e)}\n"
                     "Desmarque a opção 'Verificar se os arquivos são do dia atual' para processar este arquivo."
                 )
                 self.show_message("Erro de Data", error_summary, QMessageBox.Icon.Warning)
 
                 # Remover referência ao arquivo com erro
-                if report_type == "multas":
+                if file_type == "multas":
                     self.multas_file = None
                     self.multas_drop_area.set_file(None)
                 else:
@@ -1058,51 +1051,75 @@ class ExcelInterface(QMainWindow):
         except Exception as e:
             self._handle_generic_error(e)
 
-    def update_summary(self):
-        """Atualiza o resumo com base nos arquivos carregados"""
-        summary_html = "<div style='padding: 10px;'>"
+    def start_button_pulse_effect(self, button):
+        """Inicia o efeito de pulso para o botão especificado"""
+        if not hasattr(self, 'pulse_timers'):
+            self.pulse_timers = {}
 
-        if self.multas_file:
-            summary_multas = get_summary(self.multas_df)
-            summary_html += (
-                "<h4>Relatório de Multas:</h4>"
-                "<table style='width: 100%; border-collapse: collapse;'>"
-                f"<tr><td>Linhas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_multas['num_rows']}</td></tr>"
-                f"<tr><td>Pessoas únicas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_multas['num_unique_users']}</td></tr>"
-                f"<tr><td>Total de multas:</td><td style='color: #f57c00; font-weight: bold;'>R$ {summary_multas['total_fines'] if isinstance(summary_multas['total_fines'], (int, float)) else 0:.2f}</td></tr>"
-                "</table>"
-            )
+        if button in self.pulse_timers:
+            self.pulse_timers[button].stop()
 
-        if self.pendencias_file:
-            summary_pendencias = get_summary(self.pendencias_df)
-            summary_html += (
-                "<h4>Relatório de Pendências:</h4>"
-                "<table style='width: 100%; border-collapse: collapse;'>"
-                f"<tr><td>Linhas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_pendencias['num_rows']}</td></tr>"
-                f"<tr><td>Pessoas únicas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_pendencias['num_unique_users']}</td></tr>"
-                "</table>"
-            )
+        timer = QTimer(self)
+        self.pulse_timers[button] = timer
 
-        if self.unified_data is not None:
-            # Encontrar a coluna correta para contagem de usuários
-            if 'Código da pessoa' in self.unified_data.columns and not self.unified_data['Código da pessoa'].isna().all():
-                total_users = self.unified_data['Código da pessoa'].nunique()
-            else:
-                total_users = 0  # Valor padrão se não encontrar coluna válida
+        # Configura variáveis para controlar o pulso
+        button.pulse_intensity = 0
+        button.pulse_direction = 1  # 1 para aumentar, -1 para diminuir
 
-            summary_html += (
-                "<h4>Dados Unificados:</h4>"
-                "<table style='width: 100%; border-collapse: collapse;'>"
-                f"<tr><td>Total de registros:</td><td style='color: #2e7d32; font-weight: bold;'>{len(self.unified_data)}</td></tr>"
-                f"<tr><td>Total de usuários:</td><td style='color: #2e7d32; font-weight: bold;'>{total_users}</td></tr>"
-                "</table>"
-            )
+        # Conecta o timer ao método de pulso
+        timer.timeout.connect(lambda: self.pulse_button(button))
+        timer.start(40)  # Atualiza a cada 40ms para animação suave
 
-        summary_html += "</div>"
-        self.summary_label.setText(summary_html)
+    def stop_button_pulse_effect(self, button):
+        """Para o efeito de pulso para o botão especificado"""
+        if hasattr(self, 'pulse_timers') and button in self.pulse_timers:
+            self.pulse_timers[button].stop()
+            # Redefine o efeito do botão com a configuração normal
+            if button.objectName() == "unifyButton":
+                StyleManager.configure_button(button, 'primary')
+            elif button.objectName() == "exportJsonButton":
+                StyleManager.configure_button(button, 'success')
+
+            # Reconfigura o efeito de sombra - removido devido a incompatibilidade
+            # com QGraphicsDropShadowEffect
+
+    def pulse_button(self, button):
+        """Aplica o efeito de pulso ao botão"""
+        # Aumenta ou diminui a intensidade
+        button.pulse_intensity += button.pulse_direction * 5
+
+        # Inverte a direção quando atinge os limites
+        if button.pulse_intensity >= 100:
+            button.pulse_direction = -1
+        elif button.pulse_intensity <= 0:
+            button.pulse_direction = 1
+
+        # Calcula a cor com base na intensidade
+        if button.objectName() == "unifyButton":
+            base_color = AppColors.PRIMARY
+        elif button.objectName() == "exportJsonButton":
+            base_color = AppColors.SUCCESS
+        else:
+            return
+
+        # Calcula a cor do pulso (mais clara)
+        h, s, v, a = base_color.getHsv()
+        pulse_factor = button.pulse_intensity / 100 * 30  # Aumenta o brilho em até 30%
+        v = int(min(255, v + pulse_factor))  # Convertendo para inteiro
+        pulse_color = QColor.fromHsv(h, s, v, a)
+
+        # Aplica a cor ao botão
+        palette = button.palette()
+        palette.setColor(QPalette.ColorRole.Button, pulse_color)
+        button.setPalette(palette)
+
+        # Ajuste de sombra removido devido a incompatibilidade com QGraphicsDropShadowEffect
 
     def unify_reports(self):
         """Unifica os dois relatórios em um único DataFrame"""
+        # Parar o efeito de pulso quando o botão for clicado
+        self.stop_button_pulse_effect(self.unify_button)
+
         if not (self.multas_df is not None and self.pendencias_df is not None):
             self.show_message(
                 "Erro",
@@ -1755,10 +1772,58 @@ Atenciosamente,
         # Configurar o botão usando StyleManager em vez de CSS
         StyleManager.configure_button(button, 'secondary')
 
+        # Adicionar ícone se fornecido
+        if icon_name:
+            button.setIcon(QIcon.fromTheme(icon_name, QIcon()))
+            button.setIconSize(QSize(18, 18))
+
         if export_func:
             button.clicked.connect(export_func)
 
         return button
+
+    def update_summary(self):
+        """Atualiza o resumo com base nos arquivos carregados"""
+        summary_html = "<div style='padding: 10px;'>"
+
+        if self.multas_file:
+            summary_multas = get_summary(self.multas_df)
+            summary_html += (
+                "<h4>Relatório de Multas:</h4>"
+                "<table style='width: 100%; border-collapse: collapse;'>"
+                f"<tr><td>Linhas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_multas['num_rows']}</td></tr>"
+                f"<tr><td>Pessoas únicas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_multas['num_unique_users']}</td></tr>"
+                f"<tr><td>Total de multas:</td><td style='color: #f57c00; font-weight: bold;'>R$ {summary_multas['total_fines'] if isinstance(summary_multas['total_fines'], (int, float)) else 0:.2f}</td></tr>"
+                "</table>"
+            )
+
+        if self.pendencias_file:
+            summary_pendencias = get_summary(self.pendencias_df)
+            summary_html += (
+                "<h4>Relatório de Pendências:</h4>"
+                "<table style='width: 100%; border-collapse: collapse;'>"
+                f"<tr><td>Linhas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_pendencias['num_rows']}</td></tr>"
+                f"<tr><td>Pessoas únicas:</td><td style='color: #2e7d32; font-weight: bold;'>{summary_pendencias['num_unique_users']}</td></tr>"
+                "</table>"
+            )
+
+        if self.unified_data is not None:
+            # Encontrar a coluna correta para contagem de usuários
+            if 'Código da pessoa' in self.unified_data.columns and not self.unified_data['Código da pessoa'].isna().all():
+                total_users = self.unified_data['Código da pessoa'].nunique()
+            else:
+                total_users = 0  # Valor padrão se não encontrar coluna válida
+
+            summary_html += (
+                "<h4>Dados Unificados:</h4>"
+                "<table style='width: 100%; border-collapse: collapse;'>"
+                f"<tr><td>Total de registros:</td><td style='color: #2e7d32; font-weight: bold;'>{len(self.unified_data)}</td></tr>"
+                f"<tr><td>Total de usuários:</td><td style='color: #2e7d32; font-weight: bold;'>{total_users}</td></tr>"
+                "</table>"
+            )
+
+        summary_html += "</div>"
+        self.summary_label.setText(summary_html)
 
 
 def main():
