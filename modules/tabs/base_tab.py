@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMessageBox
 from PyQt6.QtCore import pyqtSignal
 
 
@@ -45,6 +45,6 @@ class BaseTab(QWidget):
         """Solicita a animação da barra de progresso na interface principal."""
         self.request_animate_progress.emit()
 
-    def show_message_box(self, title, message, icon=1):  # 1 = QMessageBox.Icon.Information
+    def show_message_box(self, title, message, icon=QMessageBox.Icon.Information):
         """Emite sinal para exibir uma caixa de mensagem na interface principal."""
         self.show_message.emit(title, message, icon)

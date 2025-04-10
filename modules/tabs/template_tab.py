@@ -155,12 +155,11 @@ class TemplateTab(BaseTab):
             self.show_message_box("Sucesso", "Templates salvos com sucesso!")
             self.animate_progress()
         except Exception as e:
-            self.show_message_box("Erro", f"Erro ao salvar templates: {str(e)}", 3)  # QMessageBox.Icon.Critical
+            self.show_message_box("Erro", f"Erro ao salvar templates: {str(e)}", QMessageBox.Icon.Critical)
 
     def reset_templates(self):
         """Restaura os templates para os valores padrão."""
         # Confirmar antes de resetar
-        from PyQt6.QtWidgets import QMessageBox
         confirm = QMessageBox.question(
             self, "Confirmar Restauração",
             "Tem certeza que deseja restaurar todos os templates para os valores padrão?",

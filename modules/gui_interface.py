@@ -285,6 +285,11 @@ class ExcelInterface(QMainWindow):
     def show_message(self, title, message, icon=QMessageBox.Icon.Information):
         """Exibe um QMessageBox com estilo adequado"""
         msg_box = QMessageBox(self)
+
+        # Verificar e converter o tipo do ícone se necessário
+        if isinstance(icon, int):
+            icon = QMessageBox.Icon(icon)
+
         msg_box.setIcon(icon)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
