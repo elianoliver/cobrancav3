@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 import pandas as pd
 
 # Importar as novas classes modularizadas
-from modules.tabs import BaseTab, ImportTab, ResultsTab, SummaryTab
+from modules.tabs import BaseTab, ImportTab, ResultsTab, SummaryTab, TemplateTab, ExportTab
 from modules.read_excel import unify_dataframes
 from modules.styles_fix import get_main_styles, StyleManager, AppColors
 from modules.data_processor import generate_json_file, filter_users_by_category, categorize_users
@@ -252,9 +252,14 @@ class ExcelInterface(QMainWindow):
 
             # Mostrar template padrão (Apenas Multa)
             # [Será implementado quando configurarmos a aba de templates]
+            if hasattr(self, 'template_tab'):
+                self.template_tab.update_data(self.unified_data)
 
-            # Habilitar o botão de exportação
-            # [Será atualizado quando configurarmos a aba de exportação]
+            # Habilitar a aba de exportação
+            if hasattr(self, 'export_tab'):
+                # Obter categorias de usuários
+                self.categories_count = categorize_users(self.unified_data)
+                self.export_tab.update_data(self.unified_data, self.categories_count)
 
             self.show_message("Sucesso", "Relatórios unificados com sucesso!")
 
@@ -323,15 +328,35 @@ class ExcelInterface(QMainWindow):
     # [Outras funções que ainda precisamos manter]
     def setup_template_tab(self):
         """Configura a aba de templates de email"""
-        # Esta função será modificada posteriormente para usar uma classe modularizada
-        # Temporariamente, deixaremos a implementação original
-        pass
+        # Instanciar e configurar a aba de templates
+        self.template_tab = TemplateTab(self)
+        self.template_tab.request_animate_progress.connect(self.animate_progress)
+        self.template_tab.show_message.connect(self.show_message)
+        self.template_tab.templates_updated.connect(self.handle_templates_updated)
+        self.tabs.addTab(self.template_tab, "✉️ Templates")
 
     def setup_export_tab(self):
         """Configura a aba de exportação"""
-        # Esta função será modificada posteriormente para usar uma classe modularizada
-        # Temporariamente, deixaremos a implementação original
-        pass
+        # Instanciar e configurar a aba de exportação
+        self.export_tab = ExportTab(self)
+        self.export_tab.request_animate_progress.connect(self.animate_progress)
+        self.export_tab.show_message.connect(self.show_message)
+        self.export_tab.export_completed.connect(self.handle_export_completed)
+        self.tabs.addTab(self.export_tab, "📤 Exportação")
+
+    def handle_templates_updated(self, templates):
+        """Manipula o evento quando os templates são atualizados"""
+        # Aqui podemos realizar qualquer ação necessária quando os templates são atualizados
+        # Por exemplo, atualizar alguma configuração ou notificar outras abas
+        print(f"Templates atualizados: {len(templates)} modelos")
+        # O ConfigManager já salva os templates, então não precisamos fazer nada adicional aqui
+
+    def handle_export_completed(self, format_type, file_path):
+        """Manipula o evento quando a exportação é concluída"""
+        # Aqui podemos realizar qualquer ação necessária quando a exportação é concluída
+        # Por exemplo, mostrar uma mensagem adicional ou atualizar estatísticas
+        print(f"Exportação concluída: {format_type} -> {file_path}")
+        # Podemos adicionar alguma lógica adicional posteriormente, se necessário
 
 def main():
     """Inicia a interface gráfica com PyQt6."""
