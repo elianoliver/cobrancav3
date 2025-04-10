@@ -28,6 +28,8 @@ class EmailTab(BaseTab):
         self.templates = {}
         self.unified_data = None
         self.user_data = {}
+        self.filtered_users = []  # Lista de usuários filtrados para navegação
+        self.current_preview_index = 0  # Índice do usuário atual no preview
         super().__init__(parent)
         self.load_templates()
 
@@ -82,10 +84,35 @@ class EmailTab(BaseTab):
         preview_group = QGroupBox("Preview do Email")
         preview_layout = QVBoxLayout(preview_group)
 
+        # Adicionar informação do usuário atual
+        self.preview_info_label = QLabel("")
+        preview_layout.addWidget(self.preview_info_label)
+
         self.email_preview = QTextEdit()
         self.email_preview.setReadOnly(True)
         self.email_preview.setMinimumHeight(200)
         preview_layout.addWidget(self.email_preview)
+
+        # Botões de navegação
+        navigation_container = QWidget()
+        navigation_layout = QHBoxLayout(navigation_container)
+        navigation_layout.setContentsMargins(0, 10, 0, 0)
+
+        self.prev_button = QPushButton("← Anterior")
+        StyleManager.configure_button(self.prev_button, 'secondary')
+        self.prev_button.clicked.connect(self.show_previous_preview)
+        self.prev_button.setEnabled(False)
+        navigation_layout.addWidget(self.prev_button)
+
+        navigation_layout.addStretch()
+
+        self.next_button = QPushButton("Próximo →")
+        StyleManager.configure_button(self.next_button, 'secondary')
+        self.next_button.clicked.connect(self.show_next_preview)
+        self.next_button.setEnabled(False)
+        navigation_layout.addWidget(self.next_button)
+
+        preview_layout.addWidget(navigation_container)
 
         self.layout.addWidget(preview_group)
 
@@ -495,15 +522,14 @@ class EmailTab(BaseTab):
             )
             return
 
-        # Pegar o primeiro usuário com email que se encaixa no filtro como exemplo
+        # Pegar os filtros
         user_type = self.user_type_combo.currentData()
         only_with_email = self.only_with_email.isChecked()
 
         # Filtrar usuários
-        preview_user = None
+        self.filtered_users = []
 
-        # Nesta nova implementação, as chaves do user_data são emails, então só precisamos
-        # verificar a categoria do usuário
+        # Filtrar os usuários de acordo com o tipo selecionado
         for email, user in self.user_data.items():
             # Verificar se corresponde ao tipo selecionado
             category = self.get_user_category(user)
@@ -513,23 +539,66 @@ class EmailTab(BaseTab):
                    (user_type == 'ambos' and category != 'multa_e_pendencia'):
                     continue
 
-            preview_user = user
-            break
+            self.filtered_users.append(user)
 
-        if not preview_user:
+        if not self.filtered_users:
             self.show_message_box(
                 "Aviso",
                 "Não foi encontrado nenhum usuário que atenda aos filtros para gerar o preview.",
                 QMessageBox.Icon.Warning
             )
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
             return
 
+        # Resetar o índice e mostrar o primeiro usuário
+        self.current_preview_index = 0
+        self.show_current_preview()
+
+        # Atualizar estado dos botões de navegação
+        self.update_navigation_buttons()
+
+    def show_current_preview(self):
+        """Mostra o preview do usuário atual."""
+        if not self.filtered_users or self.current_preview_index >= len(self.filtered_users):
+            return
+
+        current_user = self.filtered_users[self.current_preview_index]
+
+        # Atualizar o rótulo de informação
+        self.preview_info_label.setText(
+            f"Visualizando usuário {self.current_preview_index + 1} de {len(self.filtered_users)}: "
+            f"{current_user['nome']} ({current_user['email']})"
+        )
+
         # Processar template
-        preview_html = self.process_template(preview_user)
+        preview_html = self.process_template(current_user)
         if preview_html:
             self.email_preview.setHtml(preview_html)
         else:
             self.email_preview.setPlainText("Não foi possível gerar o preview. Verifique se os templates estão configurados corretamente.")
+
+    def show_next_preview(self):
+        """Mostra o próximo usuário na lista filtrada."""
+        if self.current_preview_index < len(self.filtered_users) - 1:
+            self.current_preview_index += 1
+            self.show_current_preview()
+            self.update_navigation_buttons()
+
+    def show_previous_preview(self):
+        """Mostra o usuário anterior na lista filtrada."""
+        if self.current_preview_index > 0:
+            self.current_preview_index -= 1
+            self.show_current_preview()
+            self.update_navigation_buttons()
+
+    def update_navigation_buttons(self):
+        """Atualiza o estado dos botões de navegação."""
+        # Habilitar/desabilitar botão anterior
+        self.prev_button.setEnabled(self.current_preview_index > 0)
+
+        # Habilitar/desabilitar botão próximo
+        self.next_button.setEnabled(self.current_preview_index < len(self.filtered_users) - 1)
 
     def send_emails(self):
         """Envia emails para os usuários que atendem aos critérios selecionados."""
