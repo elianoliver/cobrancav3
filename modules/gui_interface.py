@@ -194,10 +194,10 @@ class ExcelInterface(QMainWindow):
         self.tabs.addTab(self.results_tab, "📊 Resultados")
 
         # Instanciar e configurar a aba de resumo
-        self.summary_tab = SummaryTab(self)
-        self.summary_tab.request_animate_progress.connect(self.animate_progress)
-        self.summary_tab.show_message.connect(self.show_message)
-        self.tabs.addTab(self.summary_tab, "📋 Resumo")
+        # self.summary_tab = SummaryTab(self)
+        # self.summary_tab.request_animate_progress.connect(self.animate_progress)
+        # self.summary_tab.show_message.connect(self.show_message)
+        # self.tabs.addTab(self.summary_tab, "📋 Resumo")
 
         # Adicionar as abas restantes
         self.setup_template_tab()
@@ -222,7 +222,7 @@ class ExcelInterface(QMainWindow):
         self.pendencias_file = pendencias_file
 
         # Atualizar a aba de resumo com os novos dados
-        self.summary_tab.update_data(multas_df=multas_df, pendencias_df=pendencias_df)
+        # self.summary_tab.update_data(multas_df=multas_df, pendencias_df=pendencias_df)
 
     def unify_reports(self):
         """Unifica os dois relatórios em um único DataFrame"""
@@ -245,7 +245,7 @@ class ExcelInterface(QMainWindow):
             self.unified_data.to_excel('unificado.xlsx', index=False)
 
             # Atualizar o resumo com os dados unificados
-            self.summary_tab.update_data(unified_data=self.unified_data)
+            # self.summary_tab.update_data(unified_data=self.unified_data)
 
             # Atualizar a aba de resultados
             self.results_tab.update_data(self.unified_data)

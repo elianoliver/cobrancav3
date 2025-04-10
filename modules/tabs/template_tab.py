@@ -51,10 +51,6 @@ class TemplateTab(BaseTab):
         help_card.setObjectName("helpCard")
         help_layout = QVBoxLayout(help_card)
 
-        # help_title = QLabel("Tags Disponíveis:")
-        # StyleManager.configure_header_label(help_title)
-        # help_layout.addWidget(help_title)
-
         tags_text = QLabel(
             "<b>{NOME}</b>: Nome do usuário<br>"
             "<b>{VALOR_MULTA}</b>: Valor total das multas<br>"
