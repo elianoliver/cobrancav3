@@ -60,7 +60,7 @@ class FileDropArea(QFrame):
         layout.addWidget(self.title_label)
 
         # Instrução
-        self.text_label = QLabel("Arraste o arquivo Excel aqui\nou clique para procurar")
+        self.text_label = QLabel("Arraste o arquivo Excel \nou clique para procurar")
         self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.text_label.setWordWrap(True)
         layout.addWidget(self.text_label)
@@ -100,7 +100,7 @@ class FileDropArea(QFrame):
             self.status_label.setText("Nenhum arquivo selecionado")
             # Atualizar o estilo do status_label usando StyleManager
             StyleManager.configure_status_label(self.status_label, False)
-            self.text_label.setText("Arraste o arquivo Excel aqui\nou clique para procurar")
+            self.text_label.setText("Arraste o arquivo Excel \nou clique para procurar")
 
             # Restaurar o estilo original
             StyleManager.configure_drop_area(self, self.report_type)

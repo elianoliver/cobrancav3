@@ -140,7 +140,7 @@ class StyleManager:
         """Configura o label do logo com fonte maior e bold"""
         # Configurar fonte
         font = label.font()
-        font.setPointSize(18)
+        font.setPointSize(28)
         font.setBold(True)
         label.setFont(font)
 
@@ -636,8 +636,8 @@ def get_welcome_html():
 
 def get_categories_html(categories_data):
     """Retorna HTML formatado para categorias sem CSS complexo"""
-    rel86_stats = categories_data.get('rel86', {})
-    rel76_stats = categories_data.get('rel76', {})
+    rel86_stats = categories_data.get('relatório 86', {})
+    rel76_stats = categories_data.get('relatório 76', {})
 
     html = f"""
     <div>

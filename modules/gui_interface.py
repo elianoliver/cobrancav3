@@ -27,7 +27,7 @@ ACTION_CONTAINER_STYLE = f"""
 class ExcelInterface(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Sistema de Cobrança - Biblioteca IFC")
+        self.setWindowTitle("Sistema de Gestão de Multas e Pendências - Biblioteca IFC")
         self.setMinimumSize(1000, 700)
         self.setContentsMargins(10, 10, 10, 10)
 
@@ -57,7 +57,7 @@ class ExcelInterface(QMainWindow):
         # Widget principal
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setContentsMargins(0,0,0,0)
         main_layout.setSpacing(15)
         self.setCentralWidget(central_widget)
 
@@ -109,7 +109,7 @@ class ExcelInterface(QMainWindow):
         header_layout = QHBoxLayout(header_frame)
 
         # Logo/ícone da aplicação
-        logo_label = QLabel("📚")
+        logo_label = QLabel("📖")
         logo_label.setObjectName("logoLabel")
         logo_label.setMinimumWidth(40)
         header_layout.addWidget(logo_label)
