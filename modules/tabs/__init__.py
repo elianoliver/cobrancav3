@@ -25,7 +25,7 @@ parte específica da interface e suas funcionalidades.
 from modules.tabs.base_tab import BaseTab
 from modules.tabs.import_tab import ImportTab
 from modules.tabs.results_tab import ResultsTab
-from modules.tabs.export_tab import ExportTab
+# from modules.tabs.export_tab import ExportTab
 from modules.tabs.template_tab import TemplateTab
 from modules.tabs.email_tab import EmailTab
 
@@ -33,7 +33,7 @@ __all__ = [
     'BaseTab',
     'ImportTab',
     'ResultsTab',
-    'ExportTab',
+    # 'ExportTab',
     'TemplateTab',
     'EmailTab'
 ]
@@ -68,12 +68,12 @@ def setup_tabs(main_interface):
     tabs.append(results_tab)
 
     # Aba de exportação
-    export_tab = ExportTab(main_interface)
-    export_tab.request_animate_progress.connect(main_interface.animate_progress)
-    export_tab.show_message.connect(main_interface.show_message)
-    export_tab.export_completed.connect(main_interface.handle_export_completed)
-    main_interface.tabs.addTab(export_tab, "💾 Exportação")
-    tabs.append(export_tab)
+    # export_tab = ExportTab(main_interface)
+    # export_tab.request_animate_progress.connect(main_interface.animate_progress)
+    # export_tab.show_message.connect(main_interface.show_message)
+    # export_tab.export_completed.connect(main_interface.handle_export_completed)
+    # main_interface.tabs.addTab(export_tab, "💾 Exportação")
+    # tabs.append(export_tab)
 
     # Aba de templates
     template_tab = TemplateTab(main_interface)

@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 import pandas as pd
 
 # Importar as novas classes modularizadas
-from modules.tabs import BaseTab, ImportTab, ResultsTab, TemplateTab, ExportTab, EmailTab
+from modules.tabs import BaseTab, ImportTab, ResultsTab, TemplateTab, EmailTab
 from modules.read_excel import unify_dataframes
 from modules.styles_fix import get_main_styles, StyleManager, AppColors
 from modules.data_processor import generate_json_file, filter_users_by_category, categorize_users
@@ -186,9 +186,9 @@ class ExcelInterface(QMainWindow):
         # Criar referências diretas para cada aba para facilitar o acesso
         self.import_tab = self.all_tabs[0]
         self.results_tab = self.all_tabs[1]
-        self.export_tab = self.all_tabs[2]
-        self.template_tab = self.all_tabs[3]
-        self.email_tab = self.all_tabs[4]
+        # self.export_tab = self.all_tabs[2]
+        self.template_tab = self.all_tabs[2]
+        self.email_tab = self.all_tabs[3]
 
         # Selecionar a primeira aba por padrão
         self.tabs.setCurrentIndex(0)
@@ -242,10 +242,10 @@ class ExcelInterface(QMainWindow):
                 self.email_tab.update_data(self.unified_data)
 
             # Habilitar a aba de exportação
-            if hasattr(self, 'export_tab'):
-                # Obter categorias de usuários
-                self.categories_count = categorize_users(self.unified_data)
-                self.export_tab.update_data(self.unified_data, self.categories_count)
+            # if hasattr(self, 'export_tab'):
+            #     # Obter categorias de usuários
+            #     self.categories_count = categorize_users(self.unified_data)
+            #     self.export_tab.update_data(self.unified_data, self.categories_count)
 
             self.show_message("Sucesso", "Relatórios unificados com sucesso!")
 
@@ -327,14 +327,14 @@ class ExcelInterface(QMainWindow):
         self.template_tab.templates_updated.connect(self.handle_templates_updated)
         self.tabs.addTab(self.template_tab, "✉️ Templates")
 
-    def setup_export_tab(self):
-        """Configura a aba de exportação"""
-        # Instanciar e configurar a aba de exportação
-        self.export_tab = ExportTab(self)
-        self.export_tab.request_animate_progress.connect(self.animate_progress)
-        self.export_tab.show_message.connect(self.show_message)
-        self.export_tab.export_completed.connect(self.handle_export_completed)
-        self.tabs.addTab(self.export_tab, "📤 Exportação")
+    # def setup_export_tab(self):
+    #     """Configura a aba de exportação"""
+    #     # Instanciar e configurar a aba de exportação
+    #     self.export_tab = ExportTab(self)
+    #     self.export_tab.request_animate_progress.connect(self.animate_progress)
+    #     self.export_tab.show_message.connect(self.show_message)
+    #     self.export_tab.export_completed.connect(self.handle_export_completed)
+    #     self.tabs.addTab(self.export_tab, "📤 Exportação")
 
     def handle_templates_updated(self, templates):
         """Manipula o evento quando os templates são atualizados"""
