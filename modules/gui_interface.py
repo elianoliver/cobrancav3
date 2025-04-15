@@ -341,7 +341,11 @@ class ExcelInterface(QMainWindow):
         # Aqui podemos realizar qualquer ação necessária quando os templates são atualizados
         # Por exemplo, atualizar alguma configuração ou notificar outras abas
         print(f"Templates atualizados: {len(templates)} modelos")
-        # O ConfigManager já salva os templates, então não precisamos fazer nada adicional aqui
+
+        # Atualizar explicitamente os templates na aba de email
+        if hasattr(self, 'email_tab'):
+            self.email_tab.templates = templates.copy()  # Usar uma cópia para evitar problemas de referência
+            self.email_tab.load_templates()  # Recarregar os templates na aba de email
 
     def handle_export_completed(self, format_type, file_path):
         """Manipula o evento quando a exportação é concluída"""

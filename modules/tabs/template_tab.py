@@ -51,17 +51,17 @@ class TemplateTab(BaseTab):
         help_card.setObjectName("helpCard")
         help_layout = QVBoxLayout(help_card)
 
+        help_title = QLabel("<b>Tags Disponíveis:</b>")
+        help_layout.addWidget(help_title)
+
         tags_text = QLabel(
             "<b>{NOME}</b>: Nome do usuário<br>"
             "<b>{VALOR_MULTA}</b>: Valor total das multas<br>"
-            "<b>{LIVROS_PENDENTES}</b>: Lista de livros pendentes<br>"
-            "<b>{DIAS_ATRASO}</b>: Dias de atraso<br>"
-            "<b>{CHAVE}</b>: Número da chave (se aplicável)"
+            "<b>{LIVROS_MULTA}</b>: Lista de itens com multa<br>"
+            "<b>{LIVROS_PENDENTES}</b>: Lista de itens pendentes<br>"
         )
         tags_text.setTextFormat(Qt.TextFormat.RichText)
         help_layout.addWidget(tags_text)
-
-        self.layout.addWidget(help_card)
 
         # Área de edição de templates usando abas
         template_tabs = QTabWidget()
@@ -140,22 +140,41 @@ class TemplateTab(BaseTab):
     def save_templates(self):
         """Salva os templates nas configurações."""
         try:
-            self.templates['apenas_multa'] = self.multa_template.toPlainText()
-            self.templates['apenas_pendencia'] = self.pendencia_template.toPlainText()
-            self.templates['multa_e_pendencia'] = self.ambos_template.toPlainText()
+            # Obter os templates diretamente dos campos de texto
+            # Garantir que as quebras de linha sejam normalizadas para \n
+            # QTextEdit pode usar diferentes tipos de quebras de linha em diferentes sistemas
+            self.templates['apenas_multa'] = self.normalizar_quebras_de_linha(self.multa_template.toPlainText())
+            self.templates['apenas_pendencia'] = self.normalizar_quebras_de_linha(self.pendencia_template.toPlainText())
+            self.templates['multa_e_pendencia'] = self.normalizar_quebras_de_linha(self.ambos_template.toPlainText())
 
             # Salvar no ConfigManager
             self.config_manager.set_value('template_apenas_multa', self.templates['apenas_multa'])
             self.config_manager.set_value('template_apenas_pendencia', self.templates['apenas_pendencia'])
             self.config_manager.set_value('template_multa_e_pendencia', self.templates['multa_e_pendencia'])
 
-            # Emitir sinal de templates atualizados
-            self.templates_updated.emit(self.templates)
+            # Log para debug
+            print("Templates salvos:")
+            print(f"Apenas Multa: {len(self.templates['apenas_multa'])} caracteres")
+            print(f"Apenas Pendência: {len(self.templates['apenas_pendencia'])} caracteres")
+            print(f"Multa e Pendência: {len(self.templates['multa_e_pendencia'])} caracteres")
+
+            # Garantir que emitimos uma cópia do dicionário para evitar problemas de referência
+            templates_copy = self.templates.copy()
+            self.templates_updated.emit(templates_copy)
+            print("Sinal templates_updated emitido")
 
             self.show_message_box("Sucesso", "Templates salvos com sucesso!")
             self.animate_progress()
         except Exception as e:
             self.show_message_box("Erro", f"Erro ao salvar templates: {str(e)}", QMessageBox.Icon.Critical)
+
+    def normalizar_quebras_de_linha(self, texto):
+        """Normaliza as quebras de linha no texto para garantir compatibilidade."""
+        # Primeiro substituir CRLF (\r\n) por LF (\n)
+        texto = texto.replace('\r\n', '\n')
+        # Depois substituir CR (\r) sozinhos por LF (\n)
+        texto = texto.replace('\r', '\n')
+        return texto
 
     def reset_templates(self):
         """Restaura os templates para os valores padrão."""
@@ -179,28 +198,45 @@ class TemplateTab(BaseTab):
         """Retorna o template padrão para o tipo especificado."""
         if template_type == 'multa':
             return (
-                "Prezado(a) {NOME},\n\n"
-                "Informamos que você possui uma multa pendente no valor de R$ {VALOR_MULTA} "
-                "na Biblioteca do Instituto Federal Catarinense.\n\n"
-                "Para regularizar sua situação, por favor, dirija-se à biblioteca para quitar o débito.\n\n"
-                "Atenciosamente,\nEquipe da Biblioteca"
+                "**Prezado(a) {NOME}**,\n\n"
+                "Conforme estabelecido no [Regulamento Interno das Bibliotecas do Instituto Federal Catarinense](https://biblioteca.ifc.edu.br/wp-content/uploads/sites/53/2023/04/SIBI-Regulamento.pdf), artigo 44, é nossa responsabilidade notificá-lo(a) sobre as pendências em sua conta de usuário na biblioteca.\n\n"
+                "Constata-se a existência de multa acumulada no valor total de **R$ {VALOR_MULTA}**. referente ao(s) seguinte(s) item(ns):\n\n"
+                "{LIVROS_MULTA}\n\n"
+                "Salientamos que, para renovar ou realizar novos empréstimos, as multas devem estar abaixo de R$ 10,00. No entanto, para emitir a Declaração de Nada Consta, é necessário que todas as multas e pendências na biblioteca sejam totalmente quitadas.\n\n"
+                "Em caso de perda do material emprestado, deverá ser informado e proceder com a reposição do mesmo.\n\n"
+                "Regularize sua situação com a biblioteca o mais breve possível, para juntos, mantermos funcionando de forma eficiente e acessível para toda a comunidade acadêmica.\n\n"
+                "Estamos à disposição para esclarecer dúvidas, ou para mais informações.\n\n"
+                "Atenciosamente,"
             )
         elif template_type == 'pendencia':
             return (
-                "Prezado(a) {NOME},\n\n"
-                "Informamos que você possui os seguintes itens pendentes na Biblioteca do Instituto Federal Catarinense:\n\n"
+                "**Prezado(a) {NOME}**,\n\n"
+                "Conforme estabelecido no [Regulamento Interno das Bibliotecas do Instituto Federal Catarinense](https://biblioteca.ifc.edu.br/wp-content/uploads/sites/53/2023/04/SIBI-Regulamento.pdf), artigo 44, é nossa responsabilidade notificá-lo(a) sobre as pendências em sua conta de usuário na biblioteca.\n\n"
+                "De acordo com os registros em nosso sistema, observamos que você possui o(s) seguinte(s) item(ns) em atraso:\n\n"
                 "{LIVROS_PENDENTES}\n\n"
-                "Os itens estão com {DIAS_ATRASO} dias de atraso. Por favor, regularize sua situação o mais breve possível.\n\n"
-                "Atenciosamente,\nEquipe da Biblioteca"
+                "Conforme o artigo 44, Inciso I, do Regulamento, informamos que a multa aplicada é de R$ 1,00 (um real) por dia útil de atraso para cada material emprestado.\n\n"
+                "Salientamos que, para renovar ou realizar novos empréstimos, as multas devem estar abaixo de R$ 10,00. No entanto, para emitir a Declaração de Nada Consta, é necessário que todas as multas e pendências na biblioteca sejam totalmente quitadas.\n\n"
+                "Em caso de perda do material emprestado, deverá ser informado e proceder com a reposição do mesmo.\n\n"
+                "Regularize sua situação com a biblioteca o mais breve possível, para juntos, mantermos funcionando de forma eficiente e acessível para toda a comunidade acadêmica.\n\n"
+                "Estamos à disposição para esclarecer dúvidas, ou para mais informações.\n\n"
+                "Agradecemos sua atenção e colaboração.\n\n"
+                "Atenciosamente,"
             )
         else:  # ambos
             return (
-                "Prezado(a) {NOME},\n\n"
-                "Informamos que você possui pendências na Biblioteca do Instituto Federal Catarinense:\n\n"
-                "1. Multa no valor de R$ {VALOR_MULTA}\n"
-                "2. Itens em atraso:\n{LIVROS_PENDENTES}\n\n"
-                "Os itens estão com {DIAS_ATRASO} dias de atraso. Por favor, regularize sua situação o mais breve possível.\n\n"
-                "Atenciosamente,\nEquipe da Biblioteca"
+                "**Prezado(a) {NOME}**,\n\n"
+                "Conforme estabelecido no [Regulamento Interno das Bibliotecas do Instituto Federal Catarinense](https://biblioteca.ifc.edu.br/wp-content/uploads/sites/53/2023/04/SIBI-Regulamento.pdf), artigo 44, é nossa responsabilidade notificá-lo(a) sobre as pendências em sua conta de usuário na biblioteca.\n\n"
+                "De acordo com os registros em nosso sistema, observamos que você possui o(s) seguinte(s) item(ns) em atraso:\n\n"
+                "{LIVROS_PENDENTES}\n\n"
+                "Conforme o artigo 44, Inciso I, do Regulamento, informamos que a multa aplicada é de R$ 1,00 (um real) por dia útil de atraso para cada material emprestado.\n\n"
+                "Constata-se também a existência de multa acumulada no valor total de **R$ {VALOR_MULTA}** referente ao(s) seguinte(s) item(ns):\n\n"
+                "{LIVROS_MULTA}\n\n"
+                "Salientamos que, para renovar ou realizar novos empréstimos, as multas devem estar abaixo de R$ 10,00. No entanto, para emitir a Declaração de Nada Consta, é necessário que todas as multas e pendências na biblioteca sejam totalmente quitadas.\n\n"
+                "Em caso de perda do material emprestado, deverá ser informado e proceder com a reposição do mesmo.\n\n"
+                "Regularize sua situação com a biblioteca o mais breve possível, para juntos, mantermos funcionando de forma eficiente e acessível para toda a comunidade acadêmica.\n\n"
+                "Estamos à disposição para esclarecer dúvidas, ou para mais informações.\n\n"
+                "Agradecemos sua atenção e colaboração.\n\n"
+                "Atenciosamente,"
             )
 
     def update_data(self, unified_data=None):

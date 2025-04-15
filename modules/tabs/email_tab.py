@@ -9,6 +9,7 @@ import re
 import json
 import os
 import datetime
+import markdown
 from datetime import datetime
 
 from modules.tabs.base_tab import BaseTab
@@ -148,9 +149,29 @@ class EmailTab(BaseTab):
     def load_templates(self):
         """Carrega os templates salvos no config.json."""
         try:
-            self.templates['apenas_multa'] = self.config_manager.get_value('template_apenas_multa', '')
-            self.templates['apenas_pendencia'] = self.config_manager.get_value('template_apenas_pendencia', '')
-            self.templates['multa_e_pendencia'] = self.config_manager.get_value('template_multa_e_pendencia', '')
+            # Se o dicionário de templates já estiver preenchido pelo ExcelInterface, usamos ele diretamente
+            # Caso contrário, carregamos do ConfigManager
+            if not self.templates:
+                self.templates['apenas_multa'] = self.config_manager.get_value('template_apenas_multa', '')
+                self.templates['apenas_pendencia'] = self.config_manager.get_value('template_apenas_pendencia', '')
+                self.templates['multa_e_pendencia'] = self.config_manager.get_value('template_multa_e_pendencia', '')
+
+            # Limpar o preview atual quando os templates são recarregados
+            if hasattr(self, 'email_preview'):
+                self.email_preview.clear()
+                self.preview_info_label.setText("")
+
+            # Atualizar o preview se houver um usuário selecionado
+            if hasattr(self, 'filtered_users') and self.filtered_users and self.current_preview_index < len(self.filtered_users):
+                self.show_current_preview()
+
+            # Verificar se os templates foram carregados corretamente
+            template_keys = ['apenas_multa', 'apenas_pendencia', 'multa_e_pendencia']
+            for key in template_keys:
+                if key not in self.templates or not self.templates[key]:
+                    print(f"Aviso: Template '{key}' não foi carregado corretamente.")
+                else:
+                    print(f"Template '{key}' carregado: {len(self.templates[key])} caracteres")
         except Exception as e:
             self.show_message_box("Erro", f"Erro ao carregar templates: {str(e)}", QMessageBox.Icon.Critical)
 
@@ -337,7 +358,53 @@ class EmailTab(BaseTab):
             livros_multa = self.format_multas_text(user_data['multas'])
             template = self.replace_multa_placeholders(template, livros_multa)
 
-        return template
+        # Garantir que as quebras de linha estão normalizadas antes da conversão
+        template = self.normalizar_quebras_de_linha(template)
+
+        # Converter Markdown para HTML
+        try:
+            # Usar a extensão nl2br (newline to <br>) para preservar quebras de linha
+            # Isso converte quebras de linha simples em <br> no HTML resultante
+            html_content = markdown.markdown(template, extensions=['nl2br'])
+
+            # Adicionar estilos CSS para melhorar a aparência do email
+            css_styles = """
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.4;
+                    margin: 0;
+                    padding: 10px;
+                }
+                p { margin: 0 0 8px 0; }
+                ul { margin: 5px 0; padding-left: 20px; }
+                li { margin-bottom: 3px; }
+                strong { font-weight: bold; }
+                a { color: #0066cc; }
+                br { line-height: 1; }
+            </style>
+            """
+
+            # Garantir que o conteúdo HTML seja renderizado corretamente com espaçamento adequado
+            html_content = f"<html><head>{css_styles}</head><body>{html_content}</body></html>"
+
+            return html_content
+        except Exception as e:
+            print(f"Erro ao converter Markdown para HTML: {e}")
+            # Fallback para o template original - substituir todas as quebras de linha por <br>
+            return f"<html><body>{template.replace('\n', '<br>')}</body></html>"
+
+    def normalizar_quebras_de_linha(self, texto):
+        """Normaliza as quebras de linha no texto para garantir compatibilidade."""
+        # Primeiro substituir CRLF (\r\n) por LF (\n)
+        texto = texto.replace('\r\n', '\n')
+        # Depois substituir CR (\r) sozinhos por LF (\n)
+        texto = texto.replace('\r', '\n')
+
+        # Remover a conversão especial que estava causando espaçamento excessivo
+        # texto = texto.replace('\n\n', '\n<br>\n')
+
+        return texto
 
     def format_multas_text(self, multas):
         """Formata o texto das multas para o template."""
@@ -369,22 +436,112 @@ class EmailTab(BaseTab):
             if data_efet_raw and not pd.isna(data_efet_raw) and data_efet_raw != '':
                 data_efet = self.format_date(data_efet_raw)
 
+            # Se for uma chave e não tiver data efetivada, calcular a data efetivada baseada no valor da multa
+            eh_chave = multa.get('eh_chave', False) or 'Chave:' in titulo
+            if eh_chave and (not data_efet_raw or pd.isna(data_efet_raw) or data_efet_raw == ''):
+                try:
+                    # Se tiver data prevista, calcular a data efetivada
+                    if data_prev_raw and not pd.isna(data_prev_raw) and data_prev_raw != '':
+                        # Converter data prevista para objeto de data
+                        if isinstance(data_prev_raw, str):
+                            try:
+                                data_obj = datetime.strptime(data_prev_raw, "%d/%m/%Y")
+                            except ValueError:
+                                try:
+                                    data_obj = datetime.strptime(data_prev_raw, "%Y-%m-%d")
+                                except ValueError:
+                                    data_obj = None
+                        elif isinstance(data_prev_raw, datetime):
+                            data_obj = data_prev_raw
+                        else:
+                            data_obj = None
+
+                        # Se conseguiu converter, calcular a data efetivada
+                        if data_obj:
+                            valor_multa = int(multa.get('valor', 1))
+                            # Se o valor da multa for 1, adicionar 1 dia
+                            if valor_multa == 1:
+                                data_devolucao = data_obj + pd.Timedelta(days=1)
+                            else:
+                                data_devolucao = data_obj + pd.Timedelta(days=valor_multa)
+                            data_efet = data_devolucao.strftime("%d/%m/%Y")
+                except Exception as e:
+                    print(f"Erro ao calcular data efetivada: {e}")
+
             # Calcular dias de atraso
             dias_atraso = ''
-            if data_prev_raw and data_efet_raw and not pd.isna(data_prev_raw) and not pd.isna(data_efet_raw):
-                dias_atraso = str(self.calculate_days_difference(data_prev_raw, data_efet_raw))
 
-            # Montar o texto completo para este item
+            # Caso seja uma chave, usar o valor da multa diretamente como dias de atraso
+            if eh_chave:
+                # Para chaves, usar o valor da multa como dias de atraso (R$ 1,00 por dia)
+                valor_multa = float(multa.get('valor', 0))
+                dias_atraso = str(int(valor_multa))
+            # Caso contrário, calcular normalmente pelos dias
+            elif data_prev_raw and data_efet_raw and data_efet != 'Data não disponível':
+                try:
+                    dias_atraso = str(self.calculate_days_difference(data_prev_raw, data_efet_raw))
+                except Exception as e:
+                    print(f"Erro ao calcular dias de atraso: {e}")
+
+            # Se ainda estiver vazio e temos as duas datas, tenta novamente com as strings formatadas
+            if dias_atraso == '' and data_prev != 'Data não disponível' and data_efet != 'Data não disponível':
+                try:
+                    dias_atraso = str(self.calculate_days_difference(data_prev, data_efet))
+                except Exception as e:
+                    print(f"Erro no segundo cálculo de dias de atraso: {e}")
+
+            # Se mesmo assim dias_atraso estiver vazio, calcular com as datas convertidas manualmente
+            if dias_atraso == '' and data_prev != 'Data não disponível' and data_efet != 'Data não disponível':
+                try:
+                    # Converter manualmente e garantir o formato correto
+                    data_prev_obj = None
+                    data_efet_obj = None
+
+                    # Tenta converter data_prev
+                    if isinstance(data_prev, str):
+                        try:
+                            data_prev_obj = datetime.strptime(data_prev, '%d/%m/%Y')
+                        except ValueError:
+                            pass
+
+                    # Tenta converter data_efet
+                    if isinstance(data_efet, str):
+                        try:
+                            data_efet_obj = datetime.strptime(data_efet, '%d/%m/%Y')
+                        except ValueError:
+                            pass
+
+                    # Se conseguiu converter ambas, calcula a diferença
+                    if data_prev_obj and data_efet_obj:
+                        delta = data_efet_obj - data_prev_obj
+                        dias_atraso = str(max(0, delta.days))
+                except Exception as e:
+                    print(f"Erro no terceiro cálculo de dias de atraso: {e}")
+
+            # Se ainda estiver vazio, verificar se existe o campo dias_atraso diretamente no dicionário
+            if dias_atraso == '':
+                dias_atraso = str(multa.get('dias_atraso', ''))
+
+            # Garantir que não fique vazio mesmo que falhe todo o resto
+            if dias_atraso == '':
+                # Tenta calcular os dias diretamente do valor da multa, considerando R$1,00 por dia
+                valor_multa = float(multa.get('valor', 0))
+                if valor_multa > 0:
+                    dias_atraso = str(int(valor_multa))  # Considerando R$1,00 por dia
+                else:
+                    dias_atraso = "0"  # Valor padrão se não conseguir calcular
+
+            # Montar o texto completo para este item no formato Markdown
             item_text = (
-                f"{titulo}\n"
-                f"    - Data de Empréstimo: {data_emp}\n"
-                f"    - Data de Devolução Prevista: {data_prev}\n"
-                f"    - Data de Devolução Efetiva: {data_efet}\n"
-                f"    - Dias de Atraso: {dias_atraso}"
+                f"**{titulo}**\n"
+                f"\t- Data de Empréstimo: {data_emp}\n"
+                f"\t- Data de Devolução Prevista: {data_prev}\n"
+                f"\t- Data de Devolução Efetiva: {data_efet}\n"
+                f"\t- Dias de Atraso: {dias_atraso}"
             )
             multas_text.append(item_text)
 
-        return "\n\n- ".join(multas_text)
+        return "- " + "\n\n- ".join(multas_text)
 
     def format_pendencias_text(self, pendencias):
         """Formata o texto das pendências para o template."""
@@ -415,16 +572,16 @@ class EmailTab(BaseTab):
                 hoje = datetime.now()
                 dias_atraso = str(self.calculate_days_difference(data_prev_raw, hoje))
 
-            # Montar o texto completo para este item
+            # Montar o texto completo para este item no formato Markdown
             item_text = (
-                f"{titulo}\n"
-                f"    - Data de Empréstimo: {data_emp}\n"
-                f"    - Data de Devolução Prevista: {data_prev}\n"
-                f"    - Dias de Atraso: {dias_atraso}"
+                f"**{titulo}**\n"
+                f"\t- Data de Empréstimo: {data_emp}\n"
+                f"\t- Data de Devolução Prevista: {data_prev}\n"
+                f"\t- Dias de Atraso: {dias_atraso}"
             )
             pendencias_text.append(item_text)
 
-        return "\n\n- ".join(pendencias_text)
+        return "- " + "\n\n- ".join(pendencias_text)
 
     def replace_multa_placeholders(self, template, livros_multa):
         """Substitui os placeholders relacionados a multas no template."""

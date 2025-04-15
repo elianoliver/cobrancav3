@@ -330,14 +330,17 @@ def group_fines_by_user(df):
             tem_data_efetivada = True
 
         if tem_chave and valor_final > 0 and not tem_data_efetivada:
-            # Assumindo que a multa é de R$1 por dia de atraso
-            dias_atraso = int(valor_final)  # Arredonda para baixo
-
             try:
                 # Converter data prevista para objeto de data
                 data_obj = datetime.strptime(data_prevista, "%d/%m/%Y")
-                # Adicionar os dias de atraso
-                data_devolucao = data_obj + pd.Timedelta(days=dias_atraso)
+
+                # Se o valor da multa for 1, adicionar 1 dia à data prevista
+                if valor_final == 1:
+                    data_devolucao = data_obj + pd.Timedelta(days=1)
+                else:
+                    # Caso contrário, usar o valor da multa como dias de atraso
+                    data_devolucao = data_obj + pd.Timedelta(days=int(valor_final))
+
                 # Formatar de volta para string
                 data_efetivada_calculada = data_devolucao.strftime("%d/%m/%Y")
                 # Como calculamos a data, não está mais pendente
@@ -361,7 +364,8 @@ def group_fines_by_user(df):
             'valor_final': valor_final,
             'numero_chave': numero_chave,
             'devolucao_pendente': tem_devolucao_pendente,
-            'eh_chave': tem_chave
+            'eh_chave': tem_chave,
+            'dias_atraso': int(valor_final) if tem_chave else 0
         }
 
         # Adicionar multa à lista de multas do usuário

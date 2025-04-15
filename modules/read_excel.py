@@ -204,13 +204,25 @@ def unify_dataframes(df_multas, df_pendencias):
         if mask_chave.any():
             print(f"Encontrados {mask_chave.sum()} registros com chaves.")
 
+            # Adicionar uma coluna dias_atraso com o mesmo valor da multa para registros com chave
+            if 'Valor multa' in df.columns:
+                # Adicionar coluna dias_atraso se não existir
+                if 'dias_atraso' not in df.columns:
+                    df['dias_atraso'] = 0
+
+                # Para registros com chave, definir dias_atraso igual ao valor da multa
+                df.loc[mask_chave, 'dias_atraso'] = df.loc[mask_chave, 'Valor multa']
+                print("Dias de atraso definidos como o valor da multa para registros com chaves.")
+
             # Para títulos vazios, usar apenas "Chave: número" como título
             mask_titulo_vazio = mask_chave & (df['Título'].isna() | df['Título'].astype(str).str.strip().eq(''))
-            df.loc[mask_titulo_vazio, 'Título'] = "Chave: " + df.loc[mask_titulo_vazio, 'Número chave'].astype(str)
+            chaves_inteiras = df.loc[mask_titulo_vazio, 'Número chave'].astype(float).astype(int)
+            df.loc[mask_titulo_vazio, 'Título'] = "Chave: " + chaves_inteiras.astype(str)
 
             # Para títulos não vazios, concatenar o número da chave
             mask_titulo_nao_vazio = mask_chave & ~mask_titulo_vazio
-            df.loc[mask_titulo_nao_vazio, 'Título'] = df.loc[mask_titulo_nao_vazio, 'Título'] + " - Chave: " + df.loc[mask_titulo_nao_vazio, 'Número chave'].astype(str)
+            chaves_inteiras = df.loc[mask_titulo_nao_vazio, 'Número chave'].astype(float).astype(int)
+            df.loc[mask_titulo_nao_vazio, 'Título'] = df.loc[mask_titulo_nao_vazio, 'Título'] + " - Chave: " + chaves_inteiras.astype(str)
 
             # Fazer data de empréstimo igual à data de devolução prevista para registros com chave
             df.loc[mask_chave, 'Data de empréstimo'] = df.loc[mask_chave, 'Data devolução prevista']
