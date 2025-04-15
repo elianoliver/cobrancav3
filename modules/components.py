@@ -45,15 +45,8 @@ class FileDropArea(QFrame):
         layout.setSpacing(10)
         self.setLayout(layout)
 
-        # Ícone diferente para cada tipo de relatório
-        icon = "💰" if self.report_type == "multas" else "📚"
-        self.icon_label = QLabel(icon)
-        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setObjectName("dropIcon")
-        layout.addWidget(self.icon_label)
-
         # Descrição do tipo de relatório
-        title = "Relatório de Multas (86)" if self.report_type == "multas" else "Relatório de Pendências (76)"
+        title = "💰 Relatório de Multas (86)" if self.report_type == "multas" else "📚 Relatório de Pendências (76)"
         self.title_label = QLabel(title)
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setObjectName("dropTitle")

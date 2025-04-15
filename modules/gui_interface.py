@@ -28,8 +28,8 @@ class ExcelInterface(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sistema de Gestão de Multas e Pendências - Biblioteca IFC")
-        self.setMinimumSize(1000, 700)
-        self.setContentsMargins(10, 10, 10, 10)
+        self.setMinimumSize(1280, 720)
+        self.setContentsMargins(0, 10, 0, 10)
 
         # Inicializar o gerenciador de configuração
         self.config_manager = ConfigManager()

@@ -41,10 +41,6 @@ class ExpandableCard(QFrame):
         self.header.setPalette(palette)
         self.header.setAutoFillBackground(True)
 
-        # Título e ícone
-        self.icon_label = QLabel(icon)
-        self.icon_label.setStyleSheet("font-size: 22px;")
-
         self.title_label = QLabel(title)
         title_font = QFont()
         title_font.setBold(True)
@@ -55,9 +51,7 @@ class ExpandableCard(QFrame):
         palette = self.title_label.palette()
         palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
         self.title_label.setPalette(palette)
-        palette = self.icon_label.palette()
         palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-        self.icon_label.setPalette(palette)
 
         # Botão de expansão/contração
         self.toggle_button = QToolButton()
@@ -66,7 +60,6 @@ class ExpandableCard(QFrame):
         self.toggle_button.clicked.connect(self.toggle_content)
 
         # Adicionar widgets ao layout do cabeçalho
-        header_layout.addWidget(self.icon_label)
         header_layout.addWidget(self.title_label, 1)
         header_layout.addWidget(self.toggle_button)
 
