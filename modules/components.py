@@ -43,6 +43,7 @@ class FileDropArea(QFrame):
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setLayout(layout)
 
         # Descrição do tipo de relatório

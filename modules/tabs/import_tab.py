@@ -70,11 +70,13 @@ class ImportTab(BaseTab):
 
         # Área de drop para relatório de multas (86)
         self.multas_drop_area = FileDropArea(report_type="multas")
+        self.multas_drop_area.setFixedHeight(250)  # Tamanho fixo
         self.multas_drop_area.fileDropped.connect(self.handle_file_dropped)
         drop_layout.addWidget(self.multas_drop_area)
 
         # Área de drop para relatório de pendências (76)
         self.pendencias_drop_area = FileDropArea(report_type="pendencias")
+        self.pendencias_drop_area.setFixedHeight(250)  # Tamanho fixo
         self.pendencias_drop_area.fileDropped.connect(self.handle_file_dropped)
         drop_layout.addWidget(self.pendencias_drop_area)
 
