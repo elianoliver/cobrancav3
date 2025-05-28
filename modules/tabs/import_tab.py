@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QWidget,
-    QFrame, QGroupBox, QMessageBox, QProgressBar
+    QFrame, QGroupBox, QMessageBox, QProgressBar, QCheckBox
 )
 from PyQt6.QtGui import QIcon, QFont, QCursor, QPalette, QColor
 from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
@@ -63,32 +63,6 @@ class ImportTab(BaseTab):
         instructions_layout.addWidget(instructions_text)
         self.layout.addWidget(instructions_card)
 
-        # Opção para verificar data dos arquivos
-        date_check_container = QFrame()
-        date_check_container.setObjectName("dateCheckCard")
-        StyleManager.configure_date_check_container(date_check_container)
-        date_check_layout = QHBoxLayout(date_check_container)
-
-        date_info_label = QLabel("Verificação de data:")
-        font = date_info_label.font()
-        font.setBold(True)
-        date_info_label.setFont(font)
-        date_check_layout.addWidget(date_info_label)
-
-        self.check_date = QPushButton("Verificar se os arquivos são do dia atual")
-        self.check_date.setObjectName("checkDateButton")
-        self.check_date.setCheckable(True)
-        self.check_date.setChecked(True)
-
-        # Configurar cores usando AppColors e QPalette
-        self.update_check_date_button()
-
-        self.check_date.clicked.connect(self.toggle_date_check)
-        date_check_layout.addWidget(self.check_date)
-        date_check_layout.addStretch()
-
-        self.layout.addWidget(date_check_container)
-
         # Container para as áreas de drop
         drop_container = QWidget()
         drop_layout = QHBoxLayout(drop_container)
@@ -107,40 +81,29 @@ class ImportTab(BaseTab):
         # Adicionar container ao layout principal
         self.layout.addWidget(drop_container, 1)
 
-        # Container para botão de unificação e progresso
+        # Container para botão de unificação, checkbox e progresso
         action_container = QFrame()
         action_container.setObjectName("actionContainer")
         action_layout = QVBoxLayout(action_container)
 
-        # Botão para unificar relatórios
-        unify_container = QWidget()
-        unify_layout = QHBoxLayout(unify_container)
-        unify_layout.setContentsMargins(0, 0, 0, 0)
-        unify_layout.addStretch()
+        # Layout horizontal para unify_button e check_date
+        unify_and_check_container = QWidget()
+        unify_and_check_layout = QHBoxLayout(unify_and_check_container)
+        unify_and_check_layout.setContentsMargins(0, 0, 0, 0)
+        unify_and_check_layout.addStretch()
 
         # Criação do botão com ícone
         self.unify_button = QPushButton("  Unificar Relatórios  ")
         self.unify_button.setObjectName("unifyButton")
-
-        # Adicionar ícone usando QIcon
         icon_size = QSize(24, 24)
-        # Usamos símbolos Unicode para compatibilidade com diferentes plataformas
         self.unify_button.setIcon(QIcon.fromTheme("document-save", QIcon()))
         self.unify_button.setIconSize(icon_size)
-
-        # Configurar tamanho do botão
         self.unify_button.setMinimumWidth(250)
         self.unify_button.setMinimumHeight(50)
-
-        # Configurar fonte manualmente para precisão
         font = QFont("Segoe UI", 12)
         font.setBold(True)
         self.unify_button.setFont(font)
-
-        # Usar StyleManager para configurações básicas
         StyleManager.configure_button(self.unify_button, 'primary')
-
-        # Garantir que o texto e ícone sejam visíveis (solução de contingência)
         self.unify_button.setStyleSheet("""
             QPushButton {
                 color: white;
@@ -158,17 +121,23 @@ class ImportTab(BaseTab):
                 color: rgba(255, 255, 255, 150);
             }
         """)
-
-        # Desativar o botão por padrão até que os arquivos sejam carregados
         self.unify_button.setEnabled(False)
-
-        # Conectar ação
         self.unify_button.clicked.connect(self.unify_reports)
+        unify_and_check_layout.addWidget(self.unify_button)
 
-        unify_layout.addWidget(self.unify_button)
-        unify_layout.addStretch()
+        # Checkbox de verificação de data
+        self.check_date = QCheckBox("Verificar datas")
+        self.check_date.setObjectName("checkDateCheckBox")
+        self.check_date.setChecked(True)
+        font_cb = QFont()
+        font_cb.setBold(True)
+        self.check_date.setFont(font_cb)
+        self.check_date.setContentsMargins(12, 0, 0, 0)
+        self.check_date.stateChanged.connect(self.toggle_date_check)
+        unify_and_check_layout.addWidget(self.check_date)
+        unify_and_check_layout.addStretch()
 
-        action_layout.addWidget(unify_container)
+        action_layout.addWidget(unify_and_check_container)
 
         # Barra de progresso (inicialmente oculta)
         self.progress_bar = QProgressBar()
@@ -176,51 +145,22 @@ class ImportTab(BaseTab):
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
         self.progress_bar.setObjectName("progressBar")
-
-        # Configurar a barra de progresso com StyleManager
         StyleManager.configure_progress_bar(self.progress_bar)
-
         action_layout.addWidget(self.progress_bar)
 
         self.layout.addWidget(action_container)
 
     def update_check_date_button(self):
-        """Atualiza o estilo do botão de verificação de data usando QPalette"""
-        # Configurar o botão com cores baseadas em seu estado
-        palette = self.check_date.palette()
+        """Remove lógica de botão, pois agora é um QCheckBox. Pode ser removido ou deixado vazio."""
+        pass
 
-        if self.check_date.isChecked():
-            # Botão ativado - usar cor de ACCENT (verde)
-            palette.setColor(QPalette.ColorRole.Button, AppColors.ACCENT)
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-        else:
-            # Botão desativado - usar cor de WARNING (vermelho)
-            palette.setColor(QPalette.ColorRole.Button, AppColors.WARNING)
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-
-        self.check_date.setPalette(palette)
-        self.check_date.setAutoFillBackground(True)
-
-        # Ajustar o estilo do botão
-        font = self.check_date.font()
-        font.setBold(True)
-        self.check_date.setFont(font)
-
-        # Definir padding e bordas arredondadas
-        self.check_date.setContentsMargins(8, 8, 8, 8)
-
-    def toggle_date_check(self, checked):
+    def toggle_date_check(self, state):
         """Alterna a verificação de data dos arquivos"""
-        self.verificar_data = checked
-
-        # Atualizar o estilo do botão
-        self.update_check_date_button()
-
-        # Atualizar o texto do botão
-        if checked:
-            self.check_date.setText("Verificar se os arquivos são do dia atual")
+        self.verificar_data = bool(state)
+        if self.check_date.isChecked():
+            self.check_date.setText("Verificar datas")
         else:
-            self.check_date.setText("Ignorar a data dos arquivos")
+            self.check_date.setText("Ignorar datas")
 
     def handle_file_dropped(self, file_path, file_type):
         """Manipula quando um arquivo é solto ou selecionado em uma área de drop"""
@@ -255,7 +195,7 @@ class ImportTab(BaseTab):
             if "não é do dia atual" in str(e):
                 error_summary = (
                     f"⚠️ Erro de Data no relatório de {file_type.capitalize()}: {str(e)}\n"
-                    "Desmarque a opção 'Verificar se os arquivos são do dia atual' para processar este arquivo."
+                    "Desmarque a opção 'Verificar datas' para processar este arquivo."
                 )
                 self.show_message_box("Erro de Data", error_summary, QMessageBox.Icon.Warning)
 
