@@ -37,41 +37,20 @@ class ImportTab(BaseTab):
         header_container.setObjectName("tabHeader")
         header_layout = QVBoxLayout(header_container)
         header_layout.setContentsMargins(0, 0, 0, 20)
+        self.layout.addWidget(header_container)
 
         # Cabeçalho com título e descrição
         header = QLabel("Importação de Relatórios")
         StyleManager.configure_header_label(header)
         header_layout.addWidget(header)
 
-        description = QLabel(
-            "Arraste e solte os arquivos Excel dos relatórios 86 (Multas) e 76 (Pendências) "
-            "ou clique nas áreas abaixo para selecionar os arquivos."
-        )
-        StyleManager.configure_subheader_label(description)
-        header_layout.addWidget(description)
-
-        self.layout.addWidget(header_container)
-
         # Card de instruções
         instructions_card = QFrame()
         instructions_card.setObjectName("instructionsCard")
         instructions_layout = QVBoxLayout(instructions_card)
 
-        instructions_title = QLabel("Como funciona:")
-        font = instructions_title.font()
-        font.setPointSize(14)
-        font.setBold(True)
-        instructions_title.setFont(font)
-
-        # Configurar cor usando QPalette
-        palette = instructions_title.palette()
-        palette.setColor(QPalette.ColorRole.WindowText, AppColors.INFO)
-        instructions_title.setPalette(palette)
-
-        instructions_layout.addWidget(instructions_title)
-
         instructions_text = QLabel(
-            "1. Selecione os dois relatórios das áreas abaixo\n"
+            "1. Carregue os dois relatórios (86 e 76) nas áreas abaixo\n"
             "2. Os relatórios serão validados automaticamente\n"
             "3. Clique em \"Unificar Relatórios\" para processar os dados\n"
             "4. Navegue pelas abas para visualizar resultados e exportar dados"
@@ -82,7 +61,6 @@ class ImportTab(BaseTab):
         palette.setColor(QPalette.ColorRole.WindowText, AppColors.TEXT)
         instructions_text.setPalette(palette)
         instructions_layout.addWidget(instructions_text)
-
         self.layout.addWidget(instructions_card)
 
         # Opção para verificar data dos arquivos

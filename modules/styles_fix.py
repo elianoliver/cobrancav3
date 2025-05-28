@@ -243,15 +243,6 @@ class StyleManager:
         # Remover foco visual padrão
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        # Adicionar pequeno efeito de sombra para todos os botões
-        try:
-            # Em versões mais antigas do PyQt6, QGraphicsDropShadowEffect pode não estar disponível
-            # Nesse caso, simplesmente ignoramos o efeito de sombra
-            pass
-        except Exception:
-            # Em caso de erro, continuar sem o efeito de sombra
-            pass
-
         # Para monitorar estados do mouse
         button.enterEvent = lambda e, btn=button, hc=hover_color: StyleManager._button_hover_enter(btn, hc, e)
         button.leaveEvent = lambda e, btn=button, bc=bg_color: StyleManager._button_hover_leave(btn, bc, e)
@@ -263,13 +254,6 @@ class StyleManager:
             palette = button.palette()
             palette.setColor(QPalette.ColorRole.Button, hover_color)
             button.setPalette(palette)
-
-            # Opcionalmente, aumentar o efeito de sombra quando o mouse passa sobre o botão
-            try:
-                # Código para manipular sombra foi removido pois dependia de QGraphicsDropShadowEffect
-                pass
-            except Exception:
-                pass
 
         # Chamar o método original se existir
         try:
@@ -286,13 +270,6 @@ class StyleManager:
             palette = button.palette()
             palette.setColor(QPalette.ColorRole.Button, original_color)
             button.setPalette(palette)
-
-            # Restaurar efeito de sombra normal
-            try:
-                # Código para manipular sombra foi removido pois dependia de QGraphicsDropShadowEffect
-                pass
-            except Exception:
-                pass
 
         # Chamar o método original se existir
         try:
@@ -332,18 +309,6 @@ class StyleManager:
         palette.setColor(QPalette.ColorRole.Highlight, AppColors.PRIMARY)
         palette.setColor(QPalette.ColorRole.Base, QColor('#e0e0e0'))
         progress_bar.setPalette(palette)
-
-        # QProgressBar não possui setFrameShape, então precisamos usar um mínimo de CSS
-        # apenas para remover as bordas e arredondar os cantos
-        progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                border-radius: 4px;
-            }
-            QProgressBar::chunk {
-                border-radius: 4px;
-            }
-        """)
 
     @staticmethod
     def configure_frame(frame, style_type='card'):
