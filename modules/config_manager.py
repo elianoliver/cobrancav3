@@ -51,7 +51,12 @@ class ConfigManager:
             'template_apenas_multa': '',
             'template_apenas_pendencia': '',
             'template_multa_e_pendencia': '',
-            'ultimo_diretorio': ''
+            'ultimo_diretorio': '',
+            # Configurações de disparo de e-mails
+            'email_remetente': '',              # Endereço de e-mail do remetente
+            'email_senha_app': '',              # Senha de app do remetente
+            'email_destinatario_padrao': '',    # Destinatário padrão (opcional)
+            'email_assunto_padrao': ''          # Assunto padrão do e-mail (opcional)
         }
         self._save_config(default_config)
         return default_config
