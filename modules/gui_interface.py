@@ -29,7 +29,7 @@ class ExcelInterface(QMainWindow):
         super().__init__()
         self.setWindowTitle("Sistema de Gestão de Multas e Pendências - Biblioteca IFC")
         self.setMinimumSize(1280, 720)
-        self.setContentsMargins(0, 10, 0, 10)
+        self.setContentsMargins(0, 0, 0, 0)
 
         # Inicializar o gerenciador de configuração
         self.config_manager = ConfigManager()
@@ -58,7 +58,7 @@ class ExcelInterface(QMainWindow):
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0,0,0,0)
-        main_layout.setSpacing(15)
+        main_layout.setSpacing(0)
         self.setCentralWidget(central_widget)
 
         # Adicionar cabeçalho com logo e título

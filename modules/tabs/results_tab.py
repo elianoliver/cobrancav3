@@ -185,7 +185,7 @@ class ResultsTab(BaseTab):
         rel86_content = self.create_statistics_widget([
             ("Número total de linhas:", str(len(df_rel86))),
             ("Pessoas únicas no relatório:", str(unique_users_rel86)),
-            ("Pessoas únicas sem email:", str(len(categories['rel86']['pessoas_sem_email']))),
+            ("Pessoas sem e-mail:", str(len(categories['rel86']['pessoas_sem_email']))),
             ("Valor total de multas:", f"R$ {categories['rel86']['total_multas']:.2f}")
         ])
         rel86_card.add_content(rel86_content)
@@ -197,7 +197,7 @@ class ResultsTab(BaseTab):
         rel76_content = self.create_statistics_widget([
             ("Número total de linhas:", str(len(df_rel76))),
             ("Pessoas únicas no relatório:", str(unique_users_rel76)),
-            ("Pessoas únicas sem email:", str(len(categories['rel76']['pessoas_sem_email'])))
+            ("Pessoas sem e-mail:", str(len(categories['rel76']['pessoas_sem_email'])))
         ])
         rel76_card.add_content(rel76_content)
         self.dashboard_layout.addWidget(rel76_card, 0, 1)
