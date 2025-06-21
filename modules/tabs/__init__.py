@@ -55,14 +55,12 @@ def setup_tabs(main_interface):
     import_tab = ImportTab(main_interface)
     import_tab.files_loaded.connect(main_interface.handle_files_loaded)
     import_tab.unify_requested.connect(main_interface.unify_reports)
-    import_tab.request_animate_progress.connect(main_interface.animate_progress)
     import_tab.show_message.connect(main_interface.show_message)
     main_interface.tabs.addTab(import_tab, "📤 Importação")
     tabs.append(import_tab)
 
     # Aba de resultados
     results_tab = ResultsTab(main_interface)
-    results_tab.request_animate_progress.connect(main_interface.animate_progress)
     results_tab.show_message.connect(main_interface.show_message)
     main_interface.tabs.addTab(results_tab, "📊 Resultados")
     tabs.append(results_tab)
@@ -77,7 +75,6 @@ def setup_tabs(main_interface):
 
     # Aba de templates
     template_tab = TemplateTab(main_interface)
-    template_tab.request_animate_progress.connect(main_interface.animate_progress)
     template_tab.show_message.connect(main_interface.show_message)
     template_tab.templates_updated.connect(main_interface.handle_templates_updated)
     main_interface.tabs.addTab(template_tab, "📝 Templates")
@@ -85,7 +82,6 @@ def setup_tabs(main_interface):
 
     # Aba de emails
     email_tab = EmailTab(main_interface)
-    email_tab.request_animate_progress.connect(main_interface.animate_progress)
     email_tab.show_message.connect(main_interface.show_message)
     email_tab.email_sent.connect(lambda count: main_interface.handle_email_sent(count))
     main_interface.tabs.addTab(email_tab, "✉️ Emails")

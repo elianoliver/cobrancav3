@@ -827,6 +827,3 @@ class EmailTab(BaseTab):
 
         # Emitir sinal
         self.email_sent.emit(len(selected_users))
-
-        # Animar progresso
-        self.animate_progress()

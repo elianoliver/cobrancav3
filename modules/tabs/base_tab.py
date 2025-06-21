@@ -9,7 +9,6 @@ class BaseTab(QWidget):
     """
 
     # Sinais que serão emitidos para a interface principal
-    request_animate_progress = pyqtSignal()
     show_message = pyqtSignal(str, str, int)  # título, mensagem, tipo de ícone
 
     def __init__(self, parent=None):
@@ -40,10 +39,6 @@ class BaseTab(QWidget):
         Deve ser implementado por cada aba específica quando necessário.
         """
         pass
-
-    def animate_progress(self):
-        """Solicita a animação da barra de progresso na interface principal."""
-        self.request_animate_progress.emit()
 
     def show_message_box(self, title, message, icon=QMessageBox.Icon.Information):
         """Emite sinal para exibir uma caixa de mensagem na interface principal."""

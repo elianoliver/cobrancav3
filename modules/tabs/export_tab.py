@@ -200,8 +200,6 @@ class ExportTab(BaseTab):
 
         # Exportar baseado no formato
         try:
-            self.animate_progress()
-
             if export_format == "xlsx":
                 self.export_to_excel(filtered_data, file_path, group_by_category)
             elif export_format == "csv":

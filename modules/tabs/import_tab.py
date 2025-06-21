@@ -50,10 +50,10 @@ class ImportTab(BaseTab):
         instructions_layout = QVBoxLayout(instructions_card)
 
         instructions_text = QLabel(
-            "1. Carregue os dois relatórios (86 e 76) nas áreas abaixo\n"
-            "2. Os relatórios serão validados automaticamente\n"
-            "3. Clique em \"Unificar Relatórios\" para processar os dados\n"
-            "4. Navegue pelas abas para visualizar resultados e exportar dados"
+            "- Carregue os dois relatórios (86 e 76) nas áreas abaixo\n"
+            "- Os relatórios serão validados automaticamente\n"
+            "- Clique em \"Unificar Relatórios\" para processar os dados\n"
+            "- Navegue pelas abas para visualizar resultados e exportar dados"
         )
 
         # Configurar o texto de instruções com QPalette
@@ -175,11 +175,9 @@ class ImportTab(BaseTab):
             if file_type == "multas":
                 self.multas_file = file_path
                 self.multas_df = df
-                self.animate_progress()
             else:
                 self.pendencias_file = file_path
                 self.pendencias_df = df
-                self.animate_progress()
 
             # Emitir sinal para atualizar resumo
             if self.multas_df is not None and self.pendencias_df is not None:

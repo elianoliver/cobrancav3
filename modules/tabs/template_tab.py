@@ -164,7 +164,6 @@ class TemplateTab(BaseTab):
             print("Sinal templates_updated emitido")
 
             self.show_message_box("Sucesso", "Templates salvos com sucesso!")
-            self.animate_progress()
         except Exception as e:
             self.show_message_box("Erro", f"Erro ao salvar templates: {str(e)}", QMessageBox.Icon.Critical)
 

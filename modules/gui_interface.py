@@ -195,14 +195,9 @@ class ExcelInterface(QMainWindow):
 
     def animate_tab_change(self, index):
         """Anima a mudança de abas para uma experiência mais suave"""
-        # Animar a barra de progresso como feedback visual
-        self.progress_bar.setVisible(True)
+        # Não mostrar mais a barra de progresso ao trocar de aba
+        self.progress_bar.setVisible(False)
         self.progress_bar.setValue(0)
-
-        for i in range(101):
-            QTimer.singleShot(i * 3, lambda v=i: self.progress_bar.setValue(v))
-
-        QTimer.singleShot(350, lambda: self.progress_bar.setVisible(False))
 
     def handle_files_loaded(self, multas_df, pendencias_df, multas_file, pendencias_file):
         """Manipula o evento quando os arquivos são carregados na aba de importação"""
@@ -223,7 +218,7 @@ class ExcelInterface(QMainWindow):
 
         try:
             # Mostrar feedback visual
-            self.animate_progress()
+            # self.animate_progress()  # Removido
 
             # Chamar a função modularizada de unificação
             self.unified_data = unify_dataframes(self.multas_df, self.pendencias_df)
@@ -257,16 +252,6 @@ class ExcelInterface(QMainWindow):
             error_details = traceback.format_exc()
             print(f"Erro detalhado: {error_details}")
             self.show_message("Erro", f"Erro ao unificar relatórios: {str(e)}", QMessageBox.Icon.Critical)
-
-    def animate_progress(self):
-        """Anima a barra de progresso para feedback visual"""
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-
-        for i in range(101):
-            QTimer.singleShot(i * 10, lambda v=i: self.progress_bar.setValue(v))
-
-        QTimer.singleShot(1100, lambda: self.progress_bar.setVisible(False))
 
     def show_message(self, title, message, icon=QMessageBox.Icon.Information):
         """Exibe um QMessageBox com estilo adequado"""
