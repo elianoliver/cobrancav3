@@ -74,11 +74,6 @@ class EmailTab(BaseTab):
 
         filter_layout.addWidget(user_type_container)
 
-        # Opção para incluir apenas usuários com email
-        self.only_with_email = QCheckBox("Incluir apenas usuários com email")
-        self.only_with_email.setChecked(True)
-        filter_layout.addWidget(self.only_with_email)
-
         self.layout.addWidget(filter_group)
 
         # Preview do email
@@ -681,7 +676,6 @@ class EmailTab(BaseTab):
 
         # Pegar os filtros
         user_type = self.user_type_combo.currentData()
-        only_with_email = self.only_with_email.isChecked()
 
         # Filtrar usuários
         self.filtered_users = []
@@ -769,7 +763,6 @@ class EmailTab(BaseTab):
 
         # Pegar os filtros
         user_type = self.user_type_combo.currentData()
-        only_with_email = self.only_with_email.isChecked()
 
         # Filtrar usuários
         selected_users = []
