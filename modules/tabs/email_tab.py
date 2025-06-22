@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QMessageBox, QTableWidget, QTableWidgetItem,
     QProgressBar, QTextEdit, QComboBox, QGroupBox, QCheckBox
 )
-from PyQt6.QtCore import pyqtSignal, Qt, QDate
+from PyQt6.QtCore import pyqtSignal, Qt, QDate, QTimer
 import pandas as pd
 import re
 import json
@@ -33,6 +33,15 @@ class EmailTab(BaseTab):
         self.filtered_users = []  # Lista de usuários filtrados para navegação
         self.current_preview_index = 0  # Índice do usuário atual no preview
         self.users_without_email = []  # Lista de usuários sem email
+        
+        # Variáveis para controle de envio em lote
+        self.selected_users = []
+        self.current_email_index = 0
+        self.enviados = 0
+        self.erros = []
+        self.email_timer = QTimer()
+        self.email_timer.timeout.connect(self.send_next_email)
+        
         super().__init__(parent)
         self.load_templates()
 
@@ -822,7 +831,7 @@ class EmailTab(BaseTab):
         user_type = self.user_type_combo.currentData()
 
         # Filtrar usuários
-        selected_users = []
+        self.selected_users = []
         for email, user in self.user_data.items():
             category = self.get_user_category(user)
             if user_type != 'all':
@@ -830,9 +839,9 @@ class EmailTab(BaseTab):
                    (user_type == 'pendencias' and category != 'apenas_pendencia') or \
                    (user_type == 'ambos' and category != 'multa_e_pendencia'):
                     continue
-            selected_users.append(user)
+            self.selected_users.append(user)
 
-        if not selected_users:
+        if not self.selected_users:
             self.show_message_box(
                 "Aviso",
                 "Não foi encontrado nenhum usuário que atenda aos filtros para enviar emails.",
@@ -843,38 +852,104 @@ class EmailTab(BaseTab):
         confirm = QMessageBox.question(
             self,
             "Confirmar Envio",
-            f"Você está prestes a ENVIAR (modo teste) emails para {len(selected_users)} usuários. Confirma?\n\nObs: O envio real está BLOQUEADO por segurança.",
+            f"Você está prestes a ENVIAR (modo teste) emails para {len(self.selected_users)} usuários. Confirma?\n\nObs: O envio real está BLOQUEADO por segurança.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if confirm == QMessageBox.StandardButton.No:
             return
 
+        # Inicializar variáveis de controle
+        self.current_email_index = 0
+        self.enviados = 0
+        self.erros = []
+        
+        # Configurar barra de progresso
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.progress_bar.setMaximum(len(selected_users))
+        self.progress_bar.setMaximum(len(self.selected_users))
+        
+        # Armazenar configurações para uso no timer
+        self.remetente = remetente
+        self.senha = senha
+        self.destinatario_teste = destinatario_teste
+        self.assunto_padrao = assunto_padrao
+        self.modo_teste = modo_teste
+        
+        # Desabilitar botões durante o envio
+        self.send_button.setEnabled(False)
+        self.test_button.setEnabled(False)
+        self.preview_button.setEnabled(False)
+        
+        # Iniciar o envio do primeiro email
+        self.send_next_email()
 
-        enviados = 0
-        erros = []
-        for i, user in enumerate(selected_users):
-            email_content = self.process_template(user)
-            assunto = assunto_padrao
-            destinatario = user['email']
-            ok, msg = send_email(remetente, senha, destinatario, assunto, email_content, modo_teste=modo_teste, destinatario_teste=destinatario_teste)
-            if ok:
-                enviados += 1
-            else:
-                erros.append(msg)
-            self.progress_bar.setValue(i + 1)
+    def send_next_email(self):
+        """Envia o próximo email da lista com delay."""
+        if self.current_email_index >= len(self.selected_users):
+            # Finalizar envio
+            self.finish_email_sending()
+            return
+            
+        user = self.selected_users[self.current_email_index]
+        email_content = self.process_template(user)
+        assunto = self.assunto_padrao
+        destinatario = user['email']
+        
+        # Enviar email
+        ok, msg = send_email(
+            self.remetente, 
+            self.senha, 
+            destinatario, 
+            assunto, 
+            email_content, 
+            modo_teste=self.modo_teste, 
+            destinatario_teste=self.destinatario_teste
+        )
+        
+        if ok:
+            self.enviados += 1
+        else:
+            self.erros.append(msg)
+        
+        # Atualizar progresso
+        self.progress_bar.setValue(self.current_email_index + 1)
+        
+        # Próximo email
+        self.current_email_index += 1
+        
+        # Agendar próximo envio com delay de 0,5 segundos
+        if self.current_email_index < len(self.selected_users):
+            self.email_timer.start(500)  # 0,5 segundos de delay
+        else:
+            # Último email enviado, finalizar
+            self.finish_email_sending()
 
-        resumo = f"Foram enviados {enviados} emails (modo teste)."
-        if erros:
-            resumo += f"\n\nOcorreram erros em {len(erros)} envios:\n" + "\n".join(erros)
+    def finish_email_sending(self):
+        """Finaliza o processo de envio de emails."""
+        # Parar timer
+        self.email_timer.stop()
+        
+        # Reabilitar botões
+        self.send_button.setEnabled(True)
+        self.test_button.setEnabled(True)
+        self.preview_button.setEnabled(True)
+        
+        # Ocultar barra de progresso
+        self.progress_bar.setVisible(False)
+        
+        # Mostrar resumo
+        resumo = f"Foram enviados {self.enviados} emails (modo teste)."
+        if self.erros:
+            resumo += f"\n\nOcorreram erros em {len(self.erros)} envios:\n" + "\n".join(self.erros)
+        
         self.show_message_box(
             "Envio de Emails (Modo Teste)",
             resumo,
-            QMessageBox.Icon.Information if enviados else QMessageBox.Icon.Warning
+            QMessageBox.Icon.Information if self.enviados else QMessageBox.Icon.Warning
         )
-        self.email_sent.emit(enviados)
+        
+        # Emitir sinal
+        self.email_sent.emit(self.enviados)
 
     def test_send_email(self):
         """Envia um e-mail de teste para o destinatário de teste."""
