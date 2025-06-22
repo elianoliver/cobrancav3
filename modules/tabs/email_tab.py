@@ -16,6 +16,7 @@ from modules.tabs.base_tab import BaseTab
 from modules.styles_fix import StyleManager, AppColors
 from modules.config_manager import ConfigManager
 from modules.data_processor import filter_users_by_category
+from modules.email_sender import send_email
 
 
 class EmailTab(BaseTab):
@@ -31,6 +32,7 @@ class EmailTab(BaseTab):
         self.user_data = {}
         self.filtered_users = []  # Lista de usuários filtrados para navegação
         self.current_preview_index = 0  # Índice do usuário atual no preview
+        self.users_without_email = []  # Lista de usuários sem email
         super().__init__(parent)
         self.load_templates()
 
@@ -70,6 +72,7 @@ class EmailTab(BaseTab):
         self.user_type_combo.addItem("Apenas com Multas", "multas")
         self.user_type_combo.addItem("Apenas com Pendências", "pendencias")
         self.user_type_combo.addItem("Com Multas e Pendências", "ambos")
+        self.user_type_combo.addItem("Sem Email", "sem_email")
         user_type_layout.addWidget(self.user_type_combo)
 
         filter_layout.addWidget(user_type_container)
@@ -120,6 +123,11 @@ class EmailTab(BaseTab):
         StyleManager.configure_button(self.preview_button, 'secondary')
         self.preview_button.clicked.connect(self.generate_preview)
         actions_layout.addWidget(self.preview_button)
+
+        self.test_button = QPushButton("Testar Envio de Email")
+        StyleManager.configure_button(self.test_button, 'info')
+        self.test_button.clicked.connect(self.test_send_email)
+        actions_layout.addWidget(self.test_button)
 
         self.send_button = QPushButton("Enviar Emails")
         StyleManager.configure_button(self.send_button, 'primary')
@@ -199,6 +207,7 @@ class EmailTab(BaseTab):
 
         # Primeiro agrupamos por código de pessoa
         temp_user_data = {}
+        self.users_without_email = []  # Lista de usuários sem email
 
         # Passo 1: Agrupar por código de pessoa primeiro (para organização interna)
         for _, row in self.unified_data.iterrows():
@@ -224,6 +233,9 @@ class EmailTab(BaseTab):
                     'pendencias': [],
                     'valor_total_multas': 0.0
                 }
+                # NOVO: se não tem email, adiciona na lista
+                if email.strip() == '':
+                    self.users_without_email.append({'codigo': codigo, 'nome': nome})
 
             # Se for multa (rel86)
             relatorio = row.get('Relatório', '')
@@ -666,7 +678,7 @@ class EmailTab(BaseTab):
 
     def generate_preview(self):
         """Gera um preview do email para o usuário selecionado."""
-        if not self.user_data:
+        if not self.user_data and not hasattr(self, 'users_without_email'):
             self.show_message_box(
                 "Aviso",
                 "Não há dados de usuários para gerar preview. Carregue os dados primeiro.",
@@ -680,17 +692,21 @@ class EmailTab(BaseTab):
         # Filtrar usuários
         self.filtered_users = []
 
-        # Filtrar os usuários de acordo com o tipo selecionado
-        for email, user in self.user_data.items():
-            # Verificar se corresponde ao tipo selecionado
-            category = self.get_user_category(user)
-            if user_type != 'all':
-                if (user_type == 'multas' and category != 'apenas_multa') or \
-                   (user_type == 'pendencias' and category != 'apenas_pendencia') or \
-                   (user_type == 'ambos' and category != 'multa_e_pendencia'):
-                    continue
+        if user_type == 'sem_email':
+            # Mostrar lista de usuários sem email
+            self.filtered_users = self.users_without_email.copy() if hasattr(self, 'users_without_email') else []
+        else:
+            # Filtrar os usuários de acordo com o tipo selecionado
+            for email, user in self.user_data.items():
+                # Verificar se corresponde ao tipo selecionado
+                category = self.get_user_category(user)
+                if user_type != 'all':
+                    if (user_type == 'multas' and category != 'apenas_multa') or \
+                       (user_type == 'pendencias' and category != 'apenas_pendencia') or \
+                       (user_type == 'ambos' and category != 'multa_e_pendencia'):
+                        continue
 
-            self.filtered_users.append(user)
+                self.filtered_users.append(user)
 
         if not self.filtered_users:
             self.show_message_box(
@@ -714,20 +730,39 @@ class EmailTab(BaseTab):
         if not self.filtered_users or self.current_preview_index >= len(self.filtered_users):
             return
 
-        current_user = self.filtered_users[self.current_preview_index]
+        user_type = self.user_type_combo.currentData() if hasattr(self, 'user_type_combo') else None
 
-        # Atualizar o rótulo de informação
-        self.preview_info_label.setText(
-            f"Visualizando usuário {self.current_preview_index + 1} de {len(self.filtered_users)}: "
-            f"{current_user['nome']} ({current_user['email']})"
-        )
-
-        # Processar template
-        preview_html = self.process_template(current_user)
-        if preview_html:
-            self.email_preview.setHtml(preview_html)
+        if user_type == 'sem_email':
+            # Exibir todas as pessoas sem email de uma vez
+            self.preview_info_label.setText(
+                f"Total de {len(self.filtered_users)} pessoas sem email cadastrado"
+            )
+            
+            # Formatar a lista de todas as pessoas sem email
+            users_text = "Pessoas sem email cadastrado:\n\n"
+            for i, user in enumerate(self.filtered_users, 1):
+                users_text += f"{i:3d}. Matrícula: {user['codigo']:<10} | Nome: {user['nome']}\n"
+            
+            self.email_preview.setPlainText(users_text)
+            
+            # Desabilitar botões de navegação para pessoas sem email
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
         else:
-            self.email_preview.setPlainText("Não foi possível gerar o preview. Verifique se os templates estão configurados corretamente.")
+            current_user = self.filtered_users[self.current_preview_index]
+            
+            # Atualizar o rótulo de informação
+            self.preview_info_label.setText(
+                f"Visualizando usuário {self.current_preview_index + 1} de {len(self.filtered_users)}: "
+                f"{current_user['nome']} ({current_user['email']})"
+            )
+
+            # Processar template
+            preview_html = self.process_template(current_user)
+            if preview_html:
+                self.email_preview.setHtml(preview_html)
+            else:
+                self.email_preview.setPlainText("Não foi possível gerar o preview. Verifique se os templates estão configurados corretamente.")
 
     def show_next_preview(self):
         """Mostra o próximo usuário na lista filtrada."""
@@ -745,11 +780,18 @@ class EmailTab(BaseTab):
 
     def update_navigation_buttons(self):
         """Atualiza o estado dos botões de navegação."""
-        # Habilitar/desabilitar botão anterior
-        self.prev_button.setEnabled(self.current_preview_index > 0)
+        user_type = self.user_type_combo.currentData() if hasattr(self, 'user_type_combo') else None
+        
+        if user_type == 'sem_email':
+            # Para pessoas sem email, não precisamos de navegação
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+        else:
+            # Habilitar/desabilitar botão anterior
+            self.prev_button.setEnabled(self.current_preview_index > 0)
 
-        # Habilitar/desabilitar botão próximo
-        self.next_button.setEnabled(self.current_preview_index < len(self.filtered_users) - 1)
+            # Habilitar/desabilitar botão próximo
+            self.next_button.setEnabled(self.current_preview_index < len(self.filtered_users) - 1)
 
     def send_emails(self):
         """Envia emails para os usuários que atendem aos critérios selecionados."""
@@ -761,23 +803,33 @@ class EmailTab(BaseTab):
             )
             return
 
+        # Configurações de e-mail
+        remetente = self.config_manager.get_value('email_remetente', '')
+        senha = self.config_manager.get_value('email_senha_app', '')
+        destinatario_teste = self.config_manager.get_value('email_destinatario_padrao', remetente)
+        assunto_padrao = self.config_manager.get_value('email_assunto_padrao', 'Notificação da Biblioteca')
+        modo_teste = True  # Bloqueado por padrão
+
+        if not remetente or not senha:
+            self.show_message_box(
+                "Configuração de Email",
+                "Configure o e-mail do remetente e a senha de app nas configurações.",
+                QMessageBox.Icon.Warning
+            )
+            return
+
         # Pegar os filtros
         user_type = self.user_type_combo.currentData()
 
         # Filtrar usuários
         selected_users = []
-
-        # Na nova implementação, a chave do user_data é o email, então não precisamos
-        # verificar a existência de email, apenas o tipo do usuário
         for email, user in self.user_data.items():
-            # Verificar categoria
             category = self.get_user_category(user)
             if user_type != 'all':
                 if (user_type == 'multas' and category != 'apenas_multa') or \
                    (user_type == 'pendencias' and category != 'apenas_pendencia') or \
                    (user_type == 'ambos' and category != 'multa_e_pendencia'):
                     continue
-
             selected_users.append(user)
 
         if not selected_users:
@@ -788,42 +840,58 @@ class EmailTab(BaseTab):
             )
             return
 
-        # Confirmar antes de enviar
         confirm = QMessageBox.question(
             self,
             "Confirmar Envio",
-            f"Você está prestes a enviar emails para {len(selected_users)} usuários. Confirma?",
+            f"Você está prestes a ENVIAR (modo teste) emails para {len(selected_users)} usuários. Confirma?\n\nObs: O envio real está BLOQUEADO por segurança.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-
         if confirm == QMessageBox.StandardButton.No:
             return
 
-        # Mostrar barra de progresso
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(len(selected_users))
 
-        # TODO: Implementar o envio real de emails
-        # Por enquanto, apenas simular o envio
-
-        # Simular progresso
+        enviados = 0
+        erros = []
         for i, user in enumerate(selected_users):
-            # Gerar o conteúdo do email
             email_content = self.process_template(user)
-
-            # Aqui você chamaria a função para enviar o email
-            # send_email(user['email'], "Notificação da Biblioteca", email_content)
-
-            # Atualizar progresso
+            assunto = assunto_padrao
+            destinatario = user['email']
+            ok, msg = send_email(remetente, senha, destinatario, assunto, email_content, modo_teste=modo_teste, destinatario_teste=destinatario_teste)
+            if ok:
+                enviados += 1
+            else:
+                erros.append(msg)
             self.progress_bar.setValue(i + 1)
 
-        # Finalizar
+        resumo = f"Foram enviados {enviados} emails (modo teste)."
+        if erros:
+            resumo += f"\n\nOcorreram erros em {len(erros)} envios:\n" + "\n".join(erros)
         self.show_message_box(
-            "Sucesso",
-            f"Foram enviados emails para {len(selected_users)} usuários com sucesso!",
-            QMessageBox.Icon.Information
+            "Envio de Emails (Modo Teste)",
+            resumo,
+            QMessageBox.Icon.Information if enviados else QMessageBox.Icon.Warning
         )
+        self.email_sent.emit(enviados)
 
-        # Emitir sinal
-        self.email_sent.emit(len(selected_users))
+    def test_send_email(self):
+        """Envia um e-mail de teste para o destinatário de teste."""
+        remetente = self.config_manager.get_value('email_remetente', '')
+        senha = self.config_manager.get_value('email_senha_app', '')
+        destinatario_teste = self.config_manager.get_value('email_destinatario_padrao', remetente)
+        assunto = "Teste de Email do Sistema Biblioteca"
+        corpo = "<b>Este é um teste de envio de e-mail do sistema Biblioteca.</b><br>Se você recebeu este e-mail, a configuração está correta."
+        if not remetente or not senha:
+            self.show_message_box(
+                "Configuração de Email",
+                "Configure o e-mail do remetente e a senha de app nas configurações.",
+                QMessageBox.Icon.Warning
+            )
+            return
+        ok, msg = send_email(remetente, senha, destinatario_teste, assunto, corpo, modo_teste=True, destinatario_teste=destinatario_teste)
+        if ok:
+            self.show_message_box("Teste de Email", f"Email de teste enviado para {destinatario_teste}.", QMessageBox.Icon.Information)
+        else:
+            self.show_message_box("Erro no Teste de Email", msg, QMessageBox.Icon.Critical)
