@@ -817,7 +817,7 @@ class EmailTab(BaseTab):
         senha = self.config_manager.get_value('email_senha_app', '')
         destinatario_teste = self.config_manager.get_value('email_destinatario_padrao', remetente)
         assunto_padrao = self.config_manager.get_value('email_assunto_padrao', 'Notificação da Biblioteca')
-        modo_teste = True  # Bloqueado por padrão
+        modo_teste = self.config_manager.get_value('modo_teste', True)
 
         if not remetente or not senha:
             self.show_message_box(
@@ -849,10 +849,19 @@ class EmailTab(BaseTab):
             )
             return
 
+        confirm_text = (
+            f"Você está prestes a enviar emails para {len(self.selected_users)} usuários.\n\n"
+            f"O MODO DE TESTE está {'ATIVADO' if modo_teste else 'DESATIVADO'}.\n"
+        )
+        if modo_teste:
+            confirm_text += f"Todos os emails serão enviados para: {destinatario_teste}."
+        else:
+            confirm_text += "Os emails serão enviados para os destinatários REAIS."
+
         confirm = QMessageBox.question(
             self,
             "Confirmar Envio",
-            f"Você está prestes a ENVIAR (modo teste) emails para {len(self.selected_users)} usuários. Confirma?\n\nObs: O envio real está BLOQUEADO por segurança.",
+            confirm_text,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if confirm == QMessageBox.StandardButton.No:
@@ -938,12 +947,15 @@ class EmailTab(BaseTab):
         self.progress_bar.setVisible(False)
         
         # Mostrar resumo
-        resumo = f"Foram enviados {self.enviados} emails (modo teste)."
+        resumo = f"Foram enviados {self.enviados} emails."
+        if modo_teste:
+            resumo += " (Modo de Teste)"
+
         if self.erros:
             resumo += f"\n\nOcorreram erros em {len(self.erros)} envios:\n" + "\n".join(self.erros)
         
         self.show_message_box(
-            "Envio de Emails (Modo Teste)",
+            "Envio de Emails Concluído",
             resumo,
             QMessageBox.Icon.Information if self.enviados else QMessageBox.Icon.Warning
         )

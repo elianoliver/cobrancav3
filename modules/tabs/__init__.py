@@ -28,6 +28,7 @@ from modules.tabs.results_tab import ResultsTab
 # from modules.tabs.export_tab import ExportTab
 from modules.tabs.template_tab import TemplateTab
 from modules.tabs.email_tab import EmailTab
+from modules.tabs.config_tab import ConfigTab
 
 __all__ = [
     'BaseTab',
@@ -35,7 +36,8 @@ __all__ = [
     'ResultsTab',
     # 'ExportTab',
     'TemplateTab',
-    'EmailTab'
+    'EmailTab',
+    'ConfigTab'
 ]
 
 def setup_tabs(main_interface):
@@ -86,5 +88,12 @@ def setup_tabs(main_interface):
     email_tab.email_sent.connect(lambda count: main_interface.handle_email_sent(count))
     main_interface.tabs.addTab(email_tab, "✉️ Emails")
     tabs.append(email_tab)
+
+    # Aba de Configurações
+    config_tab = ConfigTab(main_interface)
+    config_tab.show_message.connect(main_interface.show_message)
+    config_tab.config_updated.connect(main_interface.handle_config_updated)
+    main_interface.tabs.addTab(config_tab, "⚙️ Configurações")
+    tabs.append(config_tab)
 
     return tabs

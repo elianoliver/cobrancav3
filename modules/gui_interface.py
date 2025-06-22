@@ -189,6 +189,7 @@ class ExcelInterface(QMainWindow):
         # self.export_tab = self.all_tabs[2]
         self.template_tab = self.all_tabs[2]
         self.email_tab = self.all_tabs[3]
+        self.config_tab = self.all_tabs[4]
 
         # Selecionar a primeira aba por padrão
         self.tabs.setCurrentIndex(0)
@@ -344,6 +345,16 @@ class ExcelInterface(QMainWindow):
         print(f"Emails enviados: {count}")
         self.statusBar().showMessage(f"{count} emails enviados com sucesso!", 5000)
         # Podemos adicionar alguma lógica adicional posteriormente, se necessário
+
+    def handle_config_updated(self):
+        """Manipula o evento quando as configurações são atualizadas."""
+        print("Configurações atualizadas.")
+        # Se alguma aba precisar ser atualizada, podemos fazer aqui.
+        # Por exemplo, a aba de email pode precisar recarregar as configs.
+        if hasattr(self, 'email_tab'):
+            # A EmailTab já busca as configs na hora do envio, mas se precisasse
+            # de um reload, seria aqui.
+            pass
 
 def main():
     """Inicia a interface gráfica com PyQt6."""
