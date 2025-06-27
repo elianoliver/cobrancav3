@@ -9,7 +9,6 @@ Estrutura do pacote:
 - import_tab.py: Aba de importação de arquivos Excel
 - results_tab.py: Aba de exibição de resultados da unificação
 - template_tab.py: Aba de configuração de templates de e-mail
-- export_tab.py: Aba de exportação de dados em diversos formatos
 - email_tab.py: Aba de envio de emails com templates personalizados
 
 Cada aba implementa sua própria interface gráfica e lógica de
@@ -25,7 +24,6 @@ parte específica da interface e suas funcionalidades.
 from modules.tabs.base_tab import BaseTab
 from modules.tabs.import_tab import ImportTab
 from modules.tabs.results_tab import ResultsTab
-# from modules.tabs.export_tab import ExportTab
 from modules.tabs.template_tab import TemplateTab
 from modules.tabs.email_tab import EmailTab
 from modules.tabs.config_tab import ConfigTab
@@ -34,7 +32,6 @@ __all__ = [
     'BaseTab',
     'ImportTab',
     'ResultsTab',
-    # 'ExportTab',
     'TemplateTab',
     'EmailTab',
     'ConfigTab'
@@ -66,14 +63,6 @@ def setup_tabs(main_interface):
     results_tab.show_message.connect(main_interface.show_message)
     main_interface.tabs.addTab(results_tab, "📊 Resultados")
     tabs.append(results_tab)
-
-    # Aba de exportação
-    # export_tab = ExportTab(main_interface)
-    # export_tab.request_animate_progress.connect(main_interface.animate_progress)
-    # export_tab.show_message.connect(main_interface.show_message)
-    # export_tab.export_completed.connect(main_interface.handle_export_completed)
-    # main_interface.tabs.addTab(export_tab, "💾 Exportação")
-    # tabs.append(export_tab)
 
     # Aba de templates
     template_tab = TemplateTab(main_interface)

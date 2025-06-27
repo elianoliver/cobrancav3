@@ -948,7 +948,7 @@ class EmailTab(BaseTab):
         
         # Mostrar resumo
         resumo = f"Foram enviados {self.enviados} emails."
-        if modo_teste:
+        if self.modo_teste:
             resumo += " (Modo de Teste)"
 
         if self.erros:
